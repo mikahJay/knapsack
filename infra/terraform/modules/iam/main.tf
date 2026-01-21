@@ -1,6 +1,12 @@
 // IAM module: creates deployment role and per-service roles/policies.
 // This is a starting point — review and restrict policies before use.
 
+data "aws_caller_identity" "current" {}
+
+locals {
+  deploy_principals = length(var.deploy_principals) > 0 ? var.deploy_principals : ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+}
+
 resource "aws_iam_role" "deploy_role" {
   name = "knapsack-deploy-${var.environment}"
 
@@ -10,7 +16,7 @@ resource "aws_iam_role" "deploy_role" {
       {
         Effect = "Allow",
         Principal = {
-          AWS = var.deploy_principals
+          AWS = local.deploy_principals
         },
         Action = "sts:AssumeRole"
       }
