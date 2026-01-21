@@ -15,9 +15,4 @@ variable "deploy_principals" {
   type        = list(string)
   default     = []
 }
-// Define variables for the Terraform configuration here.
-variable "aws_region" {
-  description = "AWS region for deployment"
-  type        = string
-  default     = "us-east-2"
-}
+// (duplicate aws_region removed)

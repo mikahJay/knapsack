@@ -10,6 +10,7 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region
-  # Credentials will be loaded from the environment, shared credentials file, or assumed role.
+  region  = var.aws_region
+  profile = "test"
+  # Credentials will be loaded from the named profile (`test`).
 }

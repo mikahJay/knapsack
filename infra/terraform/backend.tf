@@ -6,10 +6,10 @@
 
 terraform {
   backend "s3" {
-    bucket         = "knapsack-terraform-state-test-887401460124"
+    bucket         = "knapsack-terraform-state-test-887401460124-6ad87278"
     key            = "knapsack/test/terraform.tfstate"
     region         = "us-east-2"
-    dynamodb_table = "knapsack-terraform-locks-test-887401460124"
+    dynamodb_table = "knapsack-terraform-locks-test-887401460124-6ad87278"
     encrypt        = true
   }
 }
