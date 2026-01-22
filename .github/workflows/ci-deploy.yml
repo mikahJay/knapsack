@@ -19,6 +19,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
       - name: Ensure ECR repositories exist
         run: |
           for repo in need-server-test resource-server-test; do
@@ -46,8 +51,51 @@ jobs:
 
       - name: Force ECS redeploy (need-server)
         run: |
-          aws ecs update-service --cluster knapsack-test --service need-server-test --force-new-deployment
+          STATUS=$(aws ecs describe-clusters --clusters knapsack-test --query "clusters[0].status" --output text 2>/dev/null || echo MISSING)
+          if [ "$STATUS" != "ACTIVE" ]; then
+            echo "Cluster knapsack-test not active (status=$STATUS). Running Terraform to create cluster and services..."
+            terraform -chdir=infra/terraform init -input=false -reconfigure
+            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.need_server -target=aws_ecs_service.need_server -auto-approve || echo "terraform apply exited non-zero"
+          else
+            echo "Cluster knapsack-test is ACTIVE."
+          fi
+
+          # Try update-service; if service missing, run terraform to create it and retry once
+          OUT=$(aws ecs update-service --cluster knapsack-test --service need-server-test --force-new-deployment 2>&1) || true
+          if echo "$OUT" | grep -q "ServiceNotFoundException"; then
+            echo "need-server service not found; running Terraform to create service..."
+            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.need_server -target=aws_ecs_service.need_server -auto-approve || echo "terraform apply exited non-zero"
+            echo "Retrying update-service..."
+            aws ecs update-service --cluster knapsack-test --service need-server-test --force-new-deployment || echo "update-service failed after terraform"
+          elif echo "$OUT" | grep -q "ClusterNotFoundException"; then
+            echo "Cluster unexpectedly missing after create: $OUT"
+          elif [ -n "$OUT" ]; then
+            echo "update-service output: $OUT"
+          else
+            echo "need-server redeploy triggered successfully."
+          fi
 
       - name: Force ECS redeploy (resource-server)
         run: |
-          aws ecs update-service --cluster knapsack-test --service resource-server-test --force-new-deployment
+          STATUS=$(aws ecs describe-clusters --clusters knapsack-test --query "clusters[0].status" --output text 2>/dev/null || echo MISSING)
+          if [ "$STATUS" != "ACTIVE" ]; then
+            echo "Cluster knapsack-test not active (status=$STATUS). Running Terraform to create cluster and services..."
+            terraform -chdir=infra/terraform init -input=false -reconfigure
+            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.resource_server -target=aws_ecs_service.resource_server -auto-approve || echo "terraform apply exited non-zero"
+          else
+            echo "Cluster knapsack-test is ACTIVE."
+          fi
+
+          OUT=$(aws ecs update-service --cluster knapsack-test --service resource-server-test --force-new-deployment 2>&1) || true
+          if echo "$OUT" | grep -q "ServiceNotFoundException"; then
+            echo "resource-server service not found; running Terraform to create service..."
+            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.resource_server -target=aws_ecs_service.resource_server -auto-approve || echo "terraform apply exited non-zero"
+            echo "Retrying update-service..."
+            aws ecs update-service --cluster knapsack-test --service resource-server-test --force-new-deployment || echo "update-service failed after terraform"
+          elif echo "$OUT" | grep -q "ClusterNotFoundException"; then
+            echo "Cluster unexpectedly missing after create: $OUT"
+          elif [ -n "$OUT" ]; then
+            echo "update-service output: $OUT"
+          else
+            echo "resource-server redeploy triggered successfully."
+          fi
