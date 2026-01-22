@@ -32,3 +32,12 @@ quick:
 	wait
 
 run-all: quick
+
+# Run smoke tests for deployed services (requires AWS CLI configured)
+.PHONY: smoke-tests
+smoke-tests:
+	@echo "Running smoke tests for need-server, resource-server, auth-server"
+	@sh services/need-server/tests/smoke/smoke.sh
+	@sh services/resource-server/tests/smoke/smoke.sh
+	@sh services/auth-server/tests/smoke/smoke.sh
+	@echo "All smoke tests passed."
