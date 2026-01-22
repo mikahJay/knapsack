@@ -14,7 +14,7 @@ provider "aws" {
 resource "aws_s3_bucket" "tf_state" {
   bucket = var.bucket_name
 
-  acl    = "private"
+  acl = "private"
 
   versioning {
     enabled = true

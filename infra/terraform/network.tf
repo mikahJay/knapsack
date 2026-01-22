@@ -54,10 +54,10 @@ resource "aws_route_table_association" "public" {
 
 // Private subnets + NAT gateway
 resource "aws_subnet" "private" {
-  count             = 2
-  vpc_id            = aws_vpc.knapsack.id
-  cidr_block        = cidrsubnet(aws_vpc.knapsack.cidr_block, 8, count.index + 2)
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  count                   = 2
+  vpc_id                  = aws_vpc.knapsack.id
+  cidr_block              = cidrsubnet(aws_vpc.knapsack.cidr_block, 8, count.index + 2)
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = false
   tags = {
     Name = "knapsack-private-${count.index}-${var.environment}"
@@ -87,12 +87,12 @@ resource "aws_security_group" "nat_sg" {
 }
 
 resource "aws_instance" "nat" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = var.nat_instance_type
-  subnet_id              = aws_subnet.public[0].id
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = var.nat_instance_type
+  subnet_id                   = aws_subnet.public[0].id
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.nat_sg.id]
-  source_dest_check      = false
+  vpc_security_group_ids      = [aws_security_group.nat_sg.id]
+  source_dest_check           = false
 
   tags = {
     Name = "knapsack-nat-${var.environment}"

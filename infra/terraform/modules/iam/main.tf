@@ -27,7 +27,7 @@ resource "aws_iam_role" "deploy_role" {
 resource "aws_iam_policy" "deploy_policy" {
   name        = "knapsack-deploy-policy-${var.environment}"
   description = "Placeholder deploy policy (limit in CI)"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
       {
@@ -70,7 +70,7 @@ resource "aws_iam_role" "service_role" {
 resource "aws_iam_policy" "service_policy" {
   name        = "knapsack-service-policy-${var.environment}"
   description = "Minimal permissions for service operation (placeholder)"
-  policy      = jsonencode({
+  policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
       {

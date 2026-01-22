@@ -38,14 +38,20 @@ resource "aws_ecs_service" "need_server" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.public[*].id
-    security_groups = [aws_security_group.service_sg.id]
-    assign_public_ip = true
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.service_sg.id]
+    assign_public_ip = false
   }
 
   desired_count = 1
 
-  depends_on = [aws_ecs_cluster.knapsack]
+  load_balancer {
+    target_group_arn = aws_lb_target_group.need_server_tg.arn
+    container_name   = "need-server"
+    container_port   = 4020
+  }
+
+  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.need_server_tg]
 }
 
 // Create a log group for the service
