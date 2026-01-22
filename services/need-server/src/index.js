@@ -5,6 +5,15 @@ const port = process.env.PORT || 4020
 
 app.use(bodyParser.json())
 
+// Allow CORS for local dev web app and others
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.sendStatus(200)
+  next()
+})
+
 let needs = []
 
 app.get('/', (req, res) => res.sendStatus(200))

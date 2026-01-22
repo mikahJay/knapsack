@@ -42,8 +42,24 @@ async function main() {
   console.log('  VITE_API_RESOURCE=', env.VITE_API_RESOURCE)
   console.log('  VITE_API_AUTH=', env.VITE_API_AUTH)
 
-  const child = spawn('npx', ['vite'], { stdio: 'inherit', env })
+  // Spawn Vite through the shell to avoid Windows spawn EINVAL issues
+  const cmd = process.platform === 'win32' ? 'npx.cmd vite' : 'npx vite'
+  const child = spawn(cmd, { stdio: 'inherit', env, shell: true })
+  child.on('error', err => {
+    console.error('Failed to start Vite:', err && err.message ? err.message : err)
+    process.exit(1)
+  })
   child.on('exit', code => process.exit(code))
+
+  // Forward signals to child and exit cleanly
+  process.on('SIGINT', () => {
+    try { child.kill('SIGINT') } catch(e) {}
+    process.exit(0)
+  })
+  process.on('SIGTERM', () => {
+    try { child.kill('SIGTERM') } catch(e) {}
+    process.exit(0)
+  })
 }
 
 main()
