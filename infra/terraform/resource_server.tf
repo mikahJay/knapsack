@@ -51,7 +51,7 @@ resource "aws_ecs_service" "resource_server" {
     container_port   = 4010
   }
 
-  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.resource_server_tg]
+  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.resource_server_tg, aws_lb.alb, aws_lb_listener.http, aws_lb_listener_rule.resource_path]
 }
 
 // Create a log group for the service

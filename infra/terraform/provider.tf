@@ -11,6 +11,6 @@ terraform {
 
 provider "aws" {
   region  = var.aws_region
-  profile = "test"
-  # Credentials will be loaded from the named profile (`test`).
+  # Credentials are read from the environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+  # or from the AWS CLI configuration selected by the `AWS_PROFILE` env var.
 }
