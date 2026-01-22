@@ -1,0 +1,53 @@
+name: CI / Build & Deploy
+
+on:
+  push:
+    branches: [ deploy ]
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure ECR repositories exist
+        run: |
+          for repo in need-server-test resource-server-test; do
+            if ! aws ecr describe-repositories --repository-names "$repo" >/dev/null 2>&1; then
+              aws ecr create-repository --repository-name "$repo"
+            fi
+          done
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push need-server image
+        uses: docker/build-push-action@v4
+        with:
+          context: services/need-server
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/need-server-test:latest
+
+      - name: Build and push resource-server image
+        uses: docker/build-push-action@v4
+        with:
+          context: services/resource-server
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/resource-server-test:latest
+
+      - name: Force ECS redeploy (need-server)
+        run: |
+          aws ecs update-service --cluster knapsack-test --service need-server-test --force-new-deployment
+
+      - name: Force ECS redeploy (resource-server)
+        run: |
+          aws ecs update-service --cluster knapsack-test --service resource-server-test --force-new-deployment
