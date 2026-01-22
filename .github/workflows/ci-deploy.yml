@@ -6,7 +6,8 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build-and-deploy:
+  prepare:
+    name: Prepare infra & repos
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,145 +33,86 @@ jobs:
             fi
           done
 
+      - name: Terraform init & network apply
+        run: |
+          terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
+          terraform -chdir=infra/terraform apply -var="environment=test" \
+            -target=aws_vpc.knapsack \
+            -target=aws_internet_gateway.igw \
+            -target=aws_subnet.public \
+            -target=aws_subnet.private \
+            -target=aws_route_table.public \
+            -target=aws_route_table_association.public \
+            -target=aws_route_table.private \
+            -target=aws_route_table_association.private \
+            -target=aws_security_group.service_sg \
+            -target=aws_security_group.nat_sg \
+            -target=aws_instance.nat \
+            -target=aws_lb.alb \
+            -target=aws_lb_target_group.need_server_tg \
+            -target=aws_lb_target_group.resource_server_tg \
+            -target=aws_lb_listener.http \
+            -target=aws_lb_listener_rule.resource_path \
+            -auto-approve || echo "network apply exited non-zero"
+
+  deploy:
+    name: Build & Deploy services
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: need-server
+            repo: need-server-test
+            context: services/need-server
+            tf_name: need_server
+          - name: resource-server
+            repo: resource-server-test
+            context: services/resource-server
+            tf_name: resource_server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push need-server image
+      - name: Build and push image
         uses: docker/build-push-action@v4
         with:
-          context: services/need-server
+          context: ${{ matrix.context }}
           push: true
-          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/need-server-test:latest
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest
 
-      - name: Build and push resource-server image
-        uses: docker/build-push-action@v4
-        with:
-          context: services/resource-server
-          push: true
-          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/resource-server-test:latest
+      - name: Terraform init
+        run: terraform -chdir=infra/terraform init -input=false -reconfigure
 
-      - name: Force ECS redeploy (need-server)
+      - name: Import existing ECR repo into state (if present)
         run: |
-          STATUS=$(aws ecs describe-clusters --clusters knapsack-test --query "clusters[0].status" --output text 2>/dev/null || echo MISSING)
-          if [ "$STATUS" != "ACTIVE" ]; then
-            echo "Cluster knapsack-test not active (status=$STATUS). Running Terraform to create cluster and services..."
-            terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
-            # Ensure networking resources exist first (VPC, subnets, route tables, SGs, NAT)
-            terraform -chdir=infra/terraform apply -var="environment=test" \
-              -target=aws_vpc.knapsack \
-              -target=aws_internet_gateway.igw \
-              -target=aws_subnet.public \
-              -target=aws_subnet.private \
-              -target=aws_route_table.public \
-              -target=aws_route_table_association.public \
-              -target=aws_route_table.private \
-              -target=aws_route_table_association.private \
-              -target=aws_security_group.service_sg \
-              -target=aws_security_group.nat_sg \
-              -target=aws_instance.nat \
-              -target=aws_lb.alb \
-              -target=aws_lb_target_group.need_server_tg \
-              -target=aws_lb_target_group.resource_server_tg \
-              -target=aws_lb_listener.http \
-              -target=aws_lb_listener_rule.resource_path \
-              -auto-approve || echo "network apply exited non-zero"
-            # If ECR repo already exists, import it into the Terraform state to avoid CreateRepository conflicts
-            if aws ecr describe-repositories --repository-names "need-server-test" >/dev/null 2>&1; then
-              terraform -chdir=infra/terraform state list aws_ecr_repository.need_server >/dev/null 2>&1 || terraform -chdir=infra/terraform import aws_ecr_repository.need_server need-server-test || echo "terraform import need-server failed"
-            fi
-            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.need_server -target=aws_ecs_service.need_server -auto-approve || echo "terraform apply exited non-zero"
-          else
-            echo "Cluster knapsack-test is ACTIVE."
+          if aws ecr describe-repositories --repository-names "${{ matrix.repo }}" >/dev/null 2>&1; then
+            terraform -chdir=infra/terraform state list aws_ecr_repository.${{ matrix.tf_name }} >/dev/null 2>&1 || terraform -chdir=infra/terraform import aws_ecr_repository.${{ matrix.tf_name }} ${{ matrix.repo }} || echo "terraform import ${matrix.repo} failed"
           fi
 
-          # Try update-service; if service missing, run terraform to create it and retry once
-          OUT=$(aws ecs update-service --cluster knapsack-test --service need-server-test --force-new-deployment 2>&1) || true
+      - name: Ensure ECS cluster + service exist and redeploy
+        run: |
+          OUT=$(aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --force-new-deployment 2>&1) || true
           if echo "$OUT" | grep -q "ServiceNotFoundException"; then
-            echo "need-server service not found; running Terraform to create service..."
-            # If ECR repo already exists, import it into the Terraform state to avoid CreateRepository conflicts
-            terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
-            # Ensure networking resources exist first (VPC, subnets, route tables, SGs, NAT)
-            terraform -chdir=infra/terraform apply -var="environment=test" \
-              -target=aws_vpc.knapsack \
-              -target=aws_internet_gateway.igw \
-              -target=aws_subnet.public \
-              -target=aws_subnet.private \
-              -target=aws_route_table.public \
-              -target=aws_route_table_association.public \
-              -target=aws_route_table.private \
-              -target=aws_route_table_association.private \
-              -target=aws_security_group.service_sg \
-              -target=aws_security_group.nat_sg \
-              -target=aws_instance.nat \
-              -target=aws_lb.alb \
-              -target=aws_lb_target_group.need_server_tg \
-              -target=aws_lb_target_group.resource_server_tg \
-              -target=aws_lb_listener.http \
-              -target=aws_lb_listener_rule.resource_path \
-              -auto-approve || echo "network apply exited non-zero"
-            if aws ecr describe-repositories --repository-names "need-server-test" >/dev/null 2>&1; then
-              terraform -chdir=infra/terraform state list aws_ecr_repository.need_server >/dev/null 2>&1 || terraform -chdir=infra/terraform import aws_ecr_repository.need_server need-server-test || echo "terraform import need-server failed"
-            fi
-            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.need_server -target=aws_ecs_service.need_server -auto-approve || echo "terraform apply exited non-zero"
+            echo "${{ matrix.name }} service not found; running Terraform to create service..."
+            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.${{ matrix.tf_name }} -target=aws_ecs_service.${{ matrix.tf_name }} -auto-approve || echo "terraform apply exited non-zero"
             echo "Retrying update-service..."
-            aws ecs update-service --cluster knapsack-test --service need-server-test --force-new-deployment || echo "update-service failed after terraform"
+            aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --force-new-deployment || echo "update-service failed after terraform"
           elif echo "$OUT" | grep -q "ClusterNotFoundException"; then
             echo "Cluster unexpectedly missing after create: $OUT"
           elif [ -n "$OUT" ]; then
             echo "update-service output: $OUT"
           else
-            echo "need-server redeploy triggered successfully."
-          fi
-
-      - name: Force ECS redeploy (resource-server)
-        run: |
-          STATUS=$(aws ecs describe-clusters --clusters knapsack-test --query "clusters[0].status" --output text 2>/dev/null || echo MISSING)
-          if [ "$STATUS" != "ACTIVE" ]; then
-            echo "Cluster knapsack-test not active (status=$STATUS). Running Terraform to create cluster and services..."
-            terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
-            # Ensure networking resources exist first (VPC, subnets, route tables, SGs, NAT)
-            terraform -chdir=infra/terraform apply -var="environment=test" \
-              -target=aws_vpc.knapsack \
-              -target=aws_internet_gateway.igw \
-              -target=aws_subnet.public \
-              -target=aws_subnet.private \
-              -target=aws_route_table.public \
-              -target=aws_route_table_association.public \
-              -target=aws_route_table.private \
-              -target=aws_route_table_association.private \
-              -target=aws_security_group.service_sg \
-              -target=aws_security_group.nat_sg \
-              -target=aws_instance.nat \
-              -target=aws_lb.alb \
-              -target=aws_lb_target_group.need_server_tg \
-              -target=aws_lb_target_group.resource_server_tg \
-              -target=aws_lb_listener.http \
-              -target=aws_lb_listener_rule.resource_path \
-              -auto-approve || echo "network apply exited non-zero"
-            # If ECR repo already exists, import it into the Terraform state to avoid CreateRepository conflicts
-            if aws ecr describe-repositories --repository-names "resource-server-test" >/dev/null 2>&1; then
-              terraform -chdir=infra/terraform state list aws_ecr_repository.resource_server >/dev/null 2>&1 || terraform -chdir=infra/terraform import aws_ecr_repository.resource_server resource-server-test || echo "terraform import resource-server failed"
-            fi
-            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.resource_server -target=aws_ecs_service.resource_server -auto-approve || echo "terraform apply exited non-zero"
-          else
-            echo "Cluster knapsack-test is ACTIVE."
-          fi
-
-          OUT=$(aws ecs update-service --cluster knapsack-test --service resource-server-test --force-new-deployment 2>&1) || true
-          if echo "$OUT" | grep -q "ServiceNotFoundException"; then
-            echo "resource-server service not found; running Terraform to create service..."
-            # If ECR repo already exists, import it into the Terraform state to avoid CreateRepository conflicts
-            terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
-            if aws ecr describe-repositories --repository-names "resource-server-test" >/dev/null 2>&1; then
-              terraform -chdir=infra/terraform state list aws_ecr_repository.resource_server >/dev/null 2>&1 || terraform -chdir=infra/terraform import aws_ecr_repository.resource_server resource-server-test || echo "terraform import resource-server failed"
-            fi
-            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.resource_server -target=aws_ecs_service.resource_server -auto-approve || echo "terraform apply exited non-zero"
-            echo "Retrying update-service..."
-            aws ecs update-service --cluster knapsack-test --service resource-server-test --force-new-deployment || echo "update-service failed after terraform"
-          elif echo "$OUT" | grep -q "ClusterNotFoundException"; then
-            echo "Cluster unexpectedly missing after create: $OUT"
-          elif [ -n "$OUT" ]; then
-            echo "update-service output: $OUT"
-          else
-            echo "resource-server redeploy triggered successfully."
+            echo "${{ matrix.name }} redeploy triggered successfully."
           fi
