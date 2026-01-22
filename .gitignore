@@ -6,3 +6,4 @@ build/
 .terraform/
 .vscode/
 *.log
+*.plan

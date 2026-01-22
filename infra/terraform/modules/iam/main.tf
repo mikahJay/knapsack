@@ -79,7 +79,11 @@ resource "aws_iam_policy" "service_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents",
           "secretsmanager:GetSecretValue",
-          "s3:GetObject"
+          "s3:GetObject",
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchCheckLayerAvailability"
         ],
         Resource = "*"
       }
@@ -90,4 +94,16 @@ resource "aws_iam_policy" "service_policy" {
 resource "aws_iam_role_policy_attachment" "service_attach" {
   role       = aws_iam_role.service_role.name
   policy_arn = aws_iam_policy.service_policy.arn
+}
+
+// Attach AWS managed policy for ECR read access so ECS tasks can pull images
+resource "aws_iam_role_policy_attachment" "service_ecr_read" {
+  role       = aws_iam_role.service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+// Attach CloudWatch Logs managed policy so tasks can create log streams
+resource "aws_iam_role_policy_attachment" "service_logs" {
+  role       = aws_iam_role.service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
 }
