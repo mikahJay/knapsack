@@ -9,6 +9,9 @@ let needs = []
 
 app.get('/', (req, res) => res.sendStatus(200))
 
+// Support ALB path /need so requests routed to /need return 200 as well
+app.get('/need', (req, res) => res.sendStatus(200))
+
 app.get('/health', (req, res) => res.json({status: 'ok', service: 'need-server'}))
 
 app.get('/needs', (req, res) => res.json(needs))

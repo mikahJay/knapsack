@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/start.js",
+    "dev:local": "node scripts/start.js",
+    "dev:aws": "node scripts/start.js --remote",
     "dev:host": "vite --host 0.0.0.0 --port 5173",
     "test:smoke": "node tests/smoke/smoke.js http://localhost:5173/",
     "build": "vite build",

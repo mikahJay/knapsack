@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-# need-server smoke test: ensures at least one healthy target and that GET / returns 200
+# need-server smoke test: ensures at least one healthy target and that GET /need returns 200
 ENV=${ENV:-test}
 TG_NAME="need-server-tg-${ENV}"
 
@@ -25,7 +25,7 @@ if [ -z "$ALB_DNS" ] || [ "$ALB_DNS" = "None" ]; then
   exit 4
 fi
 
-URL="http://$ALB_DNS/"
+URL="http://$ALB_DNS/need"
 echo "Requesting $URL"
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
 echo "HTTP status: $STATUS"
