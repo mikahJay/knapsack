@@ -7,6 +7,8 @@ app.use(bodyParser.json())
 
 let needs = []
 
+app.get('/', (req, res) => res.sendStatus(200))
+
 app.get('/health', (req, res) => res.json({status: 'ok', service: 'need-server'}))
 
 app.get('/needs', (req, res) => res.json(needs))
