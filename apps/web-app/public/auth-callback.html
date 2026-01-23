@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Auth Callback</title>
+  </head>
+  <body>
+    <script>
+      // Extract access_token or id_token from URL fragment and post to opener
+      (function(){
+        function parseHash(hash){
+          const obj = {}
+          hash.replace(/^#/, '').split('&').forEach(pair => {
+            const [k,v] = pair.split('=')
+            if(k) obj[decodeURIComponent(k)] = decodeURIComponent(v || '')
+          })
+          return obj
+        }
+
+        const data = parseHash(window.location.hash)
+        try{
+          if(window.opener && (data.access_token || data.id_token || data.error)){
+            window.opener.postMessage(Object.assign({ type: 'knapsack_auth', provider: 'google' }, data), '*')
+            try{ window.close() }catch(e){}
+            return
+          }
+
+          // If there's no opener (same-window flow), stash the fragment and navigate back
+          if(!window.opener && (data.access_token || data.id_token || data.error)){
+            try{
+              sessionStorage.setItem('knapsack_auth_fragment', JSON.stringify(data))
+            }catch(e){}
+            // redirect back to the app root to let the app read the fragment
+            try{ location.replace('/') }catch(e){ location.href = '/' }
+            return
+          }
+
+          // no tokens -> show minimal info for debugging
+          const notice = document.createElement('div')
+          notice.innerText = 'No tokens found in auth response.'
+          notice.style.margin = '1rem'
+          document.body.appendChild(notice)
+        }catch(err){
+          const errdiv = document.createElement('div')
+          errdiv.innerText = 'Error parsing fragment: ' + String(err)
+          errdiv.style.margin = '1rem'
+          document.body.appendChild(errdiv)
+        }
+      })();
+    </script>
+  </body>
+</html>
