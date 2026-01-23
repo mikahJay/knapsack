@@ -12,7 +12,15 @@ async function main() {
     const lbName = `knapsack-alb-${envName}`
     console.log(`Resolving ALB DNS for ${lbName} via AWS CLI`)
     try {
-      const dns = execSync(`aws elbv2 describe-load-balancers --names ${lbName} --query \"LoadBalancers[0].DNSName\" --output text`, { stdio: ['ignore','pipe','inherit'] }).toString().trim()
+      const profile = process.env.AWS_PROFILE || process.env.AWS_DEFAULT_PROFILE
+      const profileFlag = profile ? ` --profile ${profile}` : ''
+      const regionEnv = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION
+      const regionFlag = regionEnv ? ` --region ${regionEnv}` : ''
+      const awsCmd = `aws elbv2 describe-load-balancers --names ${lbName}${profileFlag}${regionFlag} --query "LoadBalancers[0].DNSName" --output text`
+      if (profileFlag) console.log(`Using AWS profile:${profile}`)
+      if (regionFlag) console.log(`Using AWS region override:${regionEnv}`)
+      console.log(`Resolving ALB via command: ${awsCmd}`)
+      const dns = execSync(awsCmd, { stdio: ['ignore','pipe','inherit'] }).toString().trim()
       if (!dns || dns === 'None') throw new Error('ALB DNS not found')
       VITE_API_BASE = `http://${dns}`
       console.log(`Found ALB DNS: ${dns}`)
@@ -29,7 +37,8 @@ async function main() {
   if (useRemote) {
     env.VITE_API_NEED = `${VITE_API_BASE}/need`
     env.VITE_API_RESOURCE = `${VITE_API_BASE}/resource`
-    env.VITE_API_AUTH = `${VITE_API_BASE}/auth`
+    // Use local auth service for development (no HTTPS endpoint yet)
+    env.VITE_API_AUTH = 'http://localhost:4001/auth'
     env.VITE_API_BASE = VITE_API_BASE
   } else {
     // local ports for services

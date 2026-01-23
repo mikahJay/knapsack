@@ -10,16 +10,18 @@ app.use(bodyParser.json())
 
 // Allow CORS for local dev web app and others
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  // echo requested headers (if provided) so proxies/ALBs see Authorization allowed
-  const reqHeaders = req.headers['access-control-request-headers']
-  if (reqHeaders) {
-    res.setHeader('Access-Control-Allow-Headers', reqHeaders)
+  const origin = req.headers.origin || '*'
+  if (origin && origin !== '*') {
+    res.setHeader('Access-Control-Allow-Origin', origin)
   } else {
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    res.setHeader('Access-Control-Allow-Origin', '*')
   }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+  // Always allow Authorization and common headers to avoid preflight failures
+  const allowedHeaders = 'Content-Type, Authorization, X-Requested-With, Accept'
+  res.setHeader('Access-Control-Allow-Headers', allowedHeaders)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
+  res.setHeader('Access-Control-Max-Age', '600')
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
 })
@@ -223,11 +225,9 @@ app.get('/me/resources', authRequired, async (req, res) => {
   }
 })
 
-app.post('/resources', authRequired, async (req, res) => {
-  const { name, description, quantity, public: isPublic = false, attributes = {} } = req.body
+app.post('/resources', async (req, res) => {
+  const { name, description, quantity, public: isPublic = false, attributes = {}, owner = null } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
-  // owner is derived from validated id_token if present
-  const owner = req.user ? req.user.email : null
   try {
     const r = await pool.query(
       'INSERT INTO resources(name, owner, description, quantity, public, attributes) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',

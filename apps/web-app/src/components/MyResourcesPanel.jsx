@@ -29,15 +29,7 @@ export default function MyResourcesPanel(){
     const user = getUser()
     if(!user || !user.email) return setItems([])
     try{
-      const headers = {}
-      const idToken = sessionStorage.getItem('knapsack_id_token')
-      if(idToken) headers['Authorization'] = `Bearer ${idToken}`
-      const res = await fetch(`${API_BASE}/me/resources`, { headers })
-      if(res.status === 401){
-        // require login
-        location.href = buildGoogleAuthUrl()
-        return
-      }
+      const res = await fetch(`${API_BASE}/resources?owner=${encodeURIComponent(user.email)}`)
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setItems(data)
@@ -55,7 +47,8 @@ export default function MyResourcesPanel(){
       description,
       quantity: quantity ? Number(quantity) : null,
       public: isPublic,
-      attributes: {}
+      attributes: {},
+      owner: user ? (user.email || user.name) : null
     }
     try {
         const headers = { 'Content-Type': 'application/json' }
