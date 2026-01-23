@@ -63,6 +63,21 @@ async function authOptional(req, res, next){
   }
 }
 
+async function authRequired(req, res, next){
+  const auth = req.headers.authorization || ''
+  const m = auth.match(/^Bearer (.+)$/)
+  if(!m) return res.status(401).json({ error: 'missing or invalid authorization header' })
+  const token = m[1]
+  try{
+    const payload = await verifyIdToken(token)
+    req.user = { email: payload.email, name: payload.name, sub: payload.sub }
+    return next()
+  }catch(err){
+    console.error('id token verify failed', err && err.message)
+    return res.status(401).json({ error: 'invalid id_token' })
+  }
+}
+
 async function runMigrations() {
   const client = await pool.connect()
   try {
@@ -189,7 +204,19 @@ app.get('/resources/:id', async (req, res) => {
   }
 })
 
-app.post('/resources', authOptional, async (req, res) => {
+// Return resources for the authenticated user
+app.get('/me/resources', authRequired, async (req, res) => {
+  try{
+    const email = req.user && req.user.email
+    if(!email) return res.status(401).json({ error: 'unauthenticated' })
+    const r = await pool.query('SELECT * FROM resources WHERE owner = $1 ORDER BY created_at DESC', [email])
+    res.json(r.rows)
+  }catch(err){
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/resources', authRequired, async (req, res) => {
   const { name, description, quantity, public: isPublic = false, attributes = {} } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   // owner is derived from validated id_token if present

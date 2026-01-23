@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { getUser } from '../utils/auth'
+import { getUser, buildGoogleAuthUrl } from '../utils/auth'
 
 function SlideDown({ open, children }) {
   return (
@@ -21,7 +21,8 @@ export default function MyResourcesPanel(){
   const [isPublic, setIsPublic] = useState(false)
   const [status, setStatus] = useState(null)
 
-  const API_BASE = import.meta.env.VITE_API_BASE || ''
+  // prefer the resource-specific env var set by the local start script
+  const API_BASE = import.meta.env.VITE_API_RESOURCE || import.meta.env.VITE_API_BASE || ''
   const [items, setItems] = useState([])
 
   async function fetchMyResources(){
@@ -31,7 +32,12 @@ export default function MyResourcesPanel(){
       const headers = {}
       const idToken = sessionStorage.getItem('knapsack_id_token')
       if(idToken) headers['Authorization'] = `Bearer ${idToken}`
-      const res = await fetch(`${API_BASE}/resources?owner=${encodeURIComponent(user.email)}`, { headers })
+      const res = await fetch(`${API_BASE}/me/resources`, { headers })
+      if(res.status === 401){
+        // require login
+        location.href = buildGoogleAuthUrl()
+        return
+      }
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setItems(data)
