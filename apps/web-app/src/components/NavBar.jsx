@@ -38,6 +38,9 @@ export default function NavBar(){
               const u = { name: profile.name || profile.email, email: profile.email, picture: profile.picture }
               setUser(u)
               setUserState(u)
+              // store tokens for API use
+              if(msg.id_token) try{ sessionStorage.setItem('knapsack_id_token', msg.id_token) }catch(e){}
+              if(msg.access_token) try{ sessionStorage.setItem('knapsack_access_token', msg.access_token) }catch(e){}
             }catch(err){ console.error('profile fetch', err) }
             finally{
               sessionStorage.removeItem('knapsack_oauth_state')
@@ -52,6 +55,8 @@ export default function NavBar(){
           const u = { name: p.name || p.email, email: p.email, picture: p.picture }
           setUser(u)
           setUserState(u)
+          // store id_token
+          if(msg && msg.id_token) try{ sessionStorage.setItem('knapsack_id_token', msg.id_token) }catch(e){}
           sessionStorage.removeItem('knapsack_oauth_state')
           sessionStorage.removeItem('knapsack_oauth_nonce')
         }
@@ -80,6 +85,7 @@ export default function NavBar(){
     e.preventDefault()
     clearUser()
     setUserState(null)
+    try{ sessionStorage.removeItem('knapsack_id_token'); sessionStorage.removeItem('knapsack_access_token') }catch(e){}
     location.reload()
   }
 

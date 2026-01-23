@@ -2,6 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const { Pool } = require('pg')
 const format = require('pg-format')
+const { OAuth2Client } = require('google-auth-library')
 const app = express()
 const port = process.env.PORT || 4010
 
@@ -11,7 +12,7 @@ app.use(bodyParser.json())
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
 })
@@ -35,6 +36,33 @@ const pool = new Pool({
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 })
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID || null
+const oauth2Client = googleClientId ? new OAuth2Client(googleClientId) : null
+
+async function verifyIdToken(idToken){
+  if(!oauth2Client) throw new Error('GOOGLE_CLIENT_ID not configured')
+  const ticket = await oauth2Client.verifyIdToken({ idToken, audience: googleClientId })
+  return ticket.getPayload()
+}
+
+// middleware: if Authorization: Bearer <id_token> header present, verify and attach req.user
+async function authOptional(req, res, next){
+  const auth = req.headers.authorization || ''
+  if(!auth) return next()
+  const m = auth.match(/^Bearer (.+)$/)
+  if(!m) return res.status(400).json({ error: 'invalid authorization header' })
+  const token = m[1]
+  try{
+    const payload = await verifyIdToken(token)
+    // minimal user object
+    req.user = { email: payload.email, name: payload.name, sub: payload.sub }
+    return next()
+  }catch(err){
+    console.error('id token verify failed', err && err.message)
+    return res.status(401).json({ error: 'invalid id_token' })
+  }
+}
+
 async function runMigrations() {
   const client = await pool.connect()
   try {
@@ -46,6 +74,7 @@ async function runMigrations() {
       CREATE TABLE IF NOT EXISTS resources (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,
+        owner text,
         description text,
         quantity numeric CHECK (quantity > 0),
         public boolean DEFAULT false,
@@ -55,9 +84,13 @@ async function runMigrations() {
       );
     `)
 
+    // ensure owner column exists for older deployments
+    await client.query(`ALTER TABLE resources ADD COLUMN IF NOT EXISTS owner text;`)
+
     // indexes for JSONB and full-text search
     await client.query(`CREATE INDEX IF NOT EXISTS resources_attrs_idx ON resources USING GIN (attributes);`)
     await client.query(`CREATE INDEX IF NOT EXISTS resources_fulltext_idx ON resources USING GIN (to_tsvector('english', coalesce(name,'') || ' ' || coalesce(description,'') || ' ' || coalesce(attributes::text,'')));`)
+    await client.query(`CREATE INDEX IF NOT EXISTS resources_owner_idx ON resources (owner);`)
 
     // trigger to update updated_at
     await client.query(`
@@ -115,6 +148,12 @@ app.get('/resources', async (req, res) => {
   const filters = []
   const values = []
 
+  // owner filter
+  if (req.query.owner) {
+    filters.push(`owner = $${values.length + 1}`)
+    values.push(req.query.owner)
+  }
+
   if (search) {
     filters.push(`to_tsvector('english', coalesce(name,'') || ' ' || coalesce(description,'') || ' ' || coalesce(attributes::text,'')) @@ plainto_tsquery($${values.length + 1})`)
     values.push(search)
@@ -150,13 +189,15 @@ app.get('/resources/:id', async (req, res) => {
   }
 })
 
-app.post('/resources', async (req, res) => {
+app.post('/resources', authOptional, async (req, res) => {
   const { name, description, quantity, public: isPublic = false, attributes = {} } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
+  // owner is derived from validated id_token if present
+  const owner = req.user ? req.user.email : null
   try {
     const r = await pool.query(
-      'INSERT INTO resources(name, description, quantity, public, attributes) VALUES($1,$2,$3,$4,$5) RETURNING *',
-      [name, description || null, quantity || null, isPublic, attributes]
+      'INSERT INTO resources(name, owner, description, quantity, public, attributes) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
+      [name, owner, description || null, quantity || null, isPublic, attributes]
     )
     res.status(201).json(r.rows[0])
   } catch (err) {
@@ -164,9 +205,10 @@ app.post('/resources', async (req, res) => {
   }
 })
 
-app.put('/resources/:id', async (req, res) => {
+app.put('/resources/:id', authOptional, async (req, res) => {
   const fields = []
   const values = []
+  // owner is immutable after creation; do not allow owner in updates
   const allowed = ['name', 'description', 'quantity', 'public', 'attributes']
   Object.keys(req.body).forEach(k => {
     if (allowed.includes(k)) {
@@ -178,6 +220,20 @@ app.put('/resources/:id', async (req, res) => {
   const sets = fields.map((f, i) => `${f} = $${i + 1}`).join(', ')
   values.push(req.params.id)
   try {
+    // If caller attempted to set owner in body, reject if it differs from existing owner
+    if(Object.prototype.hasOwnProperty.call(req.body, 'owner')){
+      const cur = await pool.query('SELECT owner FROM resources WHERE id = $1', [req.params.id])
+      if(!cur.rows.length) return res.status(404).json({ error: 'not found' })
+      const existingOwner = cur.rows[0].owner
+      if(existingOwner !== null && req.body.owner !== existingOwner){
+        return res.status(403).json({ error: 'owner is immutable' })
+      }
+      // if existingOwner is null and caller provided owner, reject — owner is set only at creation
+      if(existingOwner === null && req.body.owner){
+        return res.status(403).json({ error: 'owner can only be set at creation' })
+      }
+    }
+    // Prevent owner changes: ignore any owner in body and disallow updates that try to set owner
     const r = await pool.query(`UPDATE resources SET ${sets} WHERE id = $${values.length} RETURNING *`, values)
     if (!r.rows.length) return res.status(404).json({ error: 'not found' })
     res.json(r.rows[0])

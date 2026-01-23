@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { getUser } from '../utils/auth'
 
 function SlideDown({ open, children }) {
   return (
@@ -21,10 +22,28 @@ export default function MyResourcesPanel(){
   const [status, setStatus] = useState(null)
 
   const API_BASE = import.meta.env.VITE_API_BASE || ''
+  const [items, setItems] = useState([])
+
+  async function fetchMyResources(){
+    const user = getUser()
+    if(!user || !user.email) return setItems([])
+    try{
+      const headers = {}
+      const idToken = sessionStorage.getItem('knapsack_id_token')
+      if(idToken) headers['Authorization'] = `Bearer ${idToken}`
+      const res = await fetch(`${API_BASE}/resources?owner=${encodeURIComponent(user.email)}`, { headers })
+      if(!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      setItems(data)
+    }catch(err){ console.error('fetch my resources', err) }
+  }
+
+  React.useEffect(()=>{ fetchMyResources() }, [])
 
   async function handleSubmit(e){
     e.preventDefault()
     setStatus('saving')
+    const user = getUser()
     const payload = {
       name,
       description,
@@ -33,14 +52,19 @@ export default function MyResourcesPanel(){
       attributes: {}
     }
     try {
-      const res = await fetch(`${API_BASE}/resources`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
+        const headers = { 'Content-Type': 'application/json' }
+        const idToken = sessionStorage.getItem('knapsack_id_token')
+        if(idToken) headers['Authorization'] = `Bearer ${idToken}`
+        const res = await fetch(`${API_BASE}/resources`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        })
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setStatus('saved')
+      // refresh list
+      fetchMyResources()
       setName('')
       setDescription('')
       setQuantity('')
@@ -82,6 +106,27 @@ export default function MyResourcesPanel(){
           </form>
         </div>
       </SlideDown>
+      <div className="mt-4">
+        <h5>My resources</h5>
+        {items.length === 0 && <div className="text-muted">No resources yet</div>}
+        {items.length > 0 && (
+          <table className="table table-sm">
+            <thead>
+              <tr><th>Name</th><th>Description</th><th>Qty</th><th>Public</th></tr>
+            </thead>
+            <tbody>
+              {items.map(it => (
+                <tr key={it.id}>
+                  <td>{it.name}</td>
+                  <td>{it.description}</td>
+                  <td>{it.quantity}</td>
+                  <td>{it.public ? 'yes' : 'no'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
