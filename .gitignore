@@ -7,3 +7,10 @@ build/
 .vscode/
 *.log
 *.plan
+# Terraform plan and state artifacts
+**/plan.tfplan
+**/*.tfplan
+# Terraform local backend files
+*.tfstate
+*.tfstate.backup
+infra/terraform/data_secrets.tf
