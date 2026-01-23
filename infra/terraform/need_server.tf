@@ -19,6 +19,26 @@ resource "aws_ecs_task_definition" "need_server" {
       portMappings = [
         { containerPort = 4020, protocol = "tcp" }
       ]
+      secrets = [
+        {
+          name      = "DB_CREDENTIALS"
+          valueFrom = aws_secretsmanager_secret.db_credentials.arn
+        }
+      ]
+      environment = [
+        {
+          name  = "DB_HOST"
+          value = aws_db_instance.knapsack.address
+        },
+        {
+          name  = "DB_PORT"
+          value = tostring(aws_db_instance.knapsack.port)
+        },
+        {
+          name  = "DB_NAME"
+          value = aws_db_instance.knapsack.db_name
+        }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {

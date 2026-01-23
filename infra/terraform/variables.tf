@@ -22,3 +22,15 @@ variable "nat_instance_type" {
   default     = "t3.micro"
 }
 // (duplicate aws_region removed)
+
+variable "db_username" {
+  description = "Master username for RDS Postgres"
+  type        = string
+  default     = "knapsack"
+}
+
+variable "db_instance_class" {
+  description = "RDS instance class"
+  type        = string
+  default     = "db.t3.micro"
+}
