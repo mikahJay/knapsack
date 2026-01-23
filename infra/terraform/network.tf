@@ -199,6 +199,7 @@ output "vpc_endpoint_ids" {
     ecr_api = aws_vpc_endpoint.ecr_api.id
     ecr_dkr = aws_vpc_endpoint.ecr_dkr.id
     logs    = aws_vpc_endpoint.logs.id
+    secretsmanager = aws_vpc_endpoint.secretsmanager.id
   }
 }
 
@@ -213,6 +214,21 @@ resource "aws_vpc_endpoint" "logs" {
 
   tags = {
     Name = "knapsack-logs-endpoint-${var.environment}"
+  }
+}
+
+// Interface endpoint for AWS Secrets Manager so tasks in private subnets
+// can retrieve secrets without requiring NAT / internet egress.
+resource "aws_vpc_endpoint" "secretsmanager" {
+  vpc_id            = aws_vpc.knapsack.id
+  service_name      = "com.amazonaws.${var.aws_region}.secretsmanager"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = aws_subnet.private[*].id
+  security_group_ids = [aws_security_group.service_sg.id]
+  private_dns_enabled = true
+
+  tags = {
+    Name = "knapsack-secretsmanager-endpoint-${var.environment}"
   }
 }
 
