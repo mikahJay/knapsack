@@ -42,10 +42,12 @@ From the repo root (requires AWS CLI configured):
 cd apps/web-app
 npm install
 # start Vite and configure the app to use the ALB found via the AWS CLI
+$env:AWS_PROFILE='test' #windows
+export AWS_PROFILE=test #unix/linux/macOS
 npm run dev:aws
 ```
 
-This will resolve the ALB for the current environment name (defaults to `test`) and set Vite env variables so the UI buttons point at the ALB paths for `need`, `resource`, and `auth` services.
+This will resolve the ALB for the current environment name (defaults to `test`) and set Vite env variables so the UI buttons point at the ALB paths for `need`, `resource`, and `auth` services. (Temporarily, `auth` will resolve to a local instance regardless of configuration, as the AWS hosted service is running on http, not https, and is therefore not supported by Google.)
 
 You can also run the helper with an explicit env name:
 

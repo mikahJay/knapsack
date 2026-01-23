@@ -35,8 +35,10 @@ async function main() {
   // Map service endpoints
   const env = Object.assign({}, process.env)
   if (useRemote) {
-    env.VITE_API_NEED = `${VITE_API_BASE}/need`
-    env.VITE_API_RESOURCE = `${VITE_API_BASE}/resource`
+    // Do not append '/need' here — ALB uses path-based routing and forwards '/need*' to the need service
+    env.VITE_API_NEED = `${VITE_API_BASE}`
+    // Do not append '/resource' here — ALB uses path-based routing and forwards '/resources' to the resource service
+    env.VITE_API_RESOURCE = `${VITE_API_BASE}`
     // Use local auth service for development (no HTTPS endpoint yet)
     env.VITE_API_AUTH = 'http://localhost:4001/auth'
     env.VITE_API_BASE = VITE_API_BASE
