@@ -128,17 +128,11 @@ export default function MyResourcesPanel(){
                           // optimistic UI update
                           setItems(prev => prev.map(p => p.id === it.id ? { ...p, public: newPublic } : p))
                           try{
-                            const url = `${API_BASE}/resources/${it.id}`
-                            const body = JSON.stringify({
-                              name: it.name,
-                              description: it.description,
-                              quantity: it.quantity,
-                              public: newPublic,
-                              attributes: it.attributes || {},
-                              owner: it.owner
-                            })
+                            // use POST toggle endpoint to avoid PUT preflight issues at ALB
+                            const url = `${API_BASE}/resources/${it.id}/toggle-public`
+                            const body = JSON.stringify({ public: newPublic })
                             const res = await fetch(url, {
-                              method: 'PUT',
+                              method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body
                             })

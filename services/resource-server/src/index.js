@@ -278,6 +278,20 @@ app.put('/resources/:id', authOptional, async (req, res) => {
   }
 })
 
+// Toggle public flag via POST to avoid clients using PUT (helps around some CORS/ALB preflight issues)
+app.post('/resources/:id/toggle-public', authOptional, async (req, res) => {
+  const id = req.params.id
+  const { public: newPublic } = req.body
+  if (typeof newPublic === 'undefined') return res.status(400).json({ error: 'public required' })
+  try{
+    const r = await pool.query('UPDATE resources SET public = $1 WHERE id = $2 RETURNING *', [newPublic, id])
+    if(!r.rows.length) return res.status(404).json({ error: 'not found' })
+    res.json(r.rows[0])
+  }catch(err){
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.delete('/resources/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM resources WHERE id = $1', [req.params.id])

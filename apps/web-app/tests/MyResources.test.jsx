@@ -108,13 +108,13 @@ describe('MyResources page', () => {
 
   test('toggles public flag and updates UI color/text', async () => {
     const initial = { id: '1', name: 'ToggleMe', description: '', quantity: 1, public: false, owner: 'test@example.com' }
-    let putCalled = false
+    let postCalled = false
 
     global.fetch.mockImplementation((url, opts) => {
-      if (opts && opts.method === 'PUT') {
+      if (url.includes('/toggle-public') && opts && opts.method === 'POST') {
         const body = JSON.parse(opts.body)
         expect(body.public).toBe(true)
-        putCalled = true
+        postCalled = true
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...initial, public: true }) })
       }
       if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
@@ -133,10 +133,9 @@ describe('MyResources page', () => {
     const row = screen.getByText('ToggleMe').closest('tr')
     const rowWithin = within(row)
     const toggleLink = rowWithin.getByRole('link')
-    // initial should reflect current state (Private or Public)
     fireEvent.click(toggleLink)
     await waitFor(() => expect(rowWithin.getByRole('link').textContent).toBe('Public'))
     expect(row.style.color).toBe('darkgreen')
-    expect(putCalled).toBe(true)
+    expect(postCalled).toBe(true)
   })
 })
