@@ -122,16 +122,19 @@ jobs:
 
       - name: Ensure ECS cluster + service exist and redeploy
         run: |
+          # Try to trigger a redeploy first (service may already exist)
           OUT=$(aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --force-new-deployment 2>&1) || true
           if echo "$OUT" | grep -q "ServiceNotFoundException"; then
-            echo "${{ matrix.name }} service not found; running Terraform to create service..."
+            echo "${{ matrix.name }} service not found; running Terraform to create cluster, task def and service..."
             terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.${{ matrix.tf_name }} -target=aws_ecs_service.${{ matrix.tf_name }} -auto-approve || echo "terraform apply exited non-zero"
             echo "Retrying update-service..."
             aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --force-new-deployment || echo "update-service failed after terraform"
           elif echo "$OUT" | grep -q "ClusterNotFoundException"; then
             echo "Cluster unexpectedly missing after create: $OUT"
-          elif [ -n "$OUT" ]; then
-            echo "update-service output: $OUT"
           else
-            echo "${{ matrix.name }} redeploy triggered successfully."
+            # Service exists; register a new task definition revision (via Terraform) with the new image, then force deployment
+            echo "Service exists; registering new task definition revision via Terraform..."
+            terraform -chdir=infra/terraform apply -var="environment=test" -target=aws_ecs_task_definition.${{ matrix.tf_name }} -auto-approve || echo "terraform apply for task_definition exited non-zero"
+            echo "Triggering service redeploy to pick up new task definition..."
+            aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --force-new-deployment || echo "update-service failed"
           fi
