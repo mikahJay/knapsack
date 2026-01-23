@@ -109,7 +109,7 @@ resource "aws_lb_listener_rule" "resource_path" {
 
   condition {
     path_pattern {
-      values = ["/resource*"]
+      values = ["/resources*"]
     }
   }
 }
