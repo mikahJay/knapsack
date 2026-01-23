@@ -1,0 +1,108 @@
+import React from 'react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import MyResources from '../src/pages/MyResources'
+import MyResourcesPanel from '../src/components/MyResourcesPanel'
+import { BrowserRouter } from 'react-router-dom'
+
+vi.mock('../src/utils/auth', () => ({
+  getUser: () => ({ email: 'test@example.com', name: 'Test User' }),
+  buildGoogleAuthUrl: () => '/auth-callback.html'
+}))
+
+describe('MyResources page', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.resetAllMocks()
+  })
+
+  test('loads and displays user resources', async () => {
+    const resources = [
+      { id: '1', name: 'Res A', description: 'A', quantity: 1, public: false },
+      { id: '2', name: 'Res B', description: 'B', quantity: 2, public: true }
+    ]
+
+    global.fetch.mockImplementation((url, opts) => {
+      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(resources) })
+      }
+      return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
+    })
+
+    render(
+      <BrowserRouter>
+        <MyResources />
+      </BrowserRouter>
+    )
+
+    // panel should show entries after fetch
+    await waitFor(() => expect(screen.getByText('My Resources')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Res A')).toBeInTheDocument())
+    expect(screen.getByText('Res B')).toBeInTheDocument()
+  })
+
+  test('creates a resource and refreshes list', async () => {
+    const created = { id: '3', name: 'New', description: 'new', quantity: 5, public: false }
+    // first fetch for list returns empty, then after create returns new item
+    let call = 0
+    global.fetch.mockImplementation((url, opts) => {
+      if (opts && opts.method === 'POST') {
+        call++
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(created) })
+      }
+      // GET list
+      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+        if (call === 0) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([created]) })
+      }
+      return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
+    })
+
+    render(
+      <BrowserRouter>
+        <MyResourcesPanel />
+      </BrowserRouter>
+    )
+
+    // open form
+    fireEvent.click(screen.getByText('Create Resource'))
+    // fill form (inputs have no associated labels so use roles)
+    const textboxes = screen.getAllByRole('textbox')
+    // textboxes[0] = Name input, textboxes[1] = Description textarea
+    fireEvent.change(textboxes[0], { target: { value: 'New' } })
+    fireEvent.change(textboxes[1], { target: { value: 'new' } })
+    const quantityInput = screen.getByRole('spinbutton')
+    fireEvent.change(quantityInput, { target: { value: '5' } })
+    // submit
+    fireEvent.click(screen.getByText('Submit'))
+
+    // after submit, list should refresh and show created
+    await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument())
+  })
+
+  test("requests resources for the current user and only shows those resources", async () => {
+    const mine = { id: '10', name: 'Mine', description: 'mine', quantity: 1, public: false, owner: 'test@example.com' }
+    const theirs = { id: '11', name: 'Theirs', description: 'theirs', quantity: 2, public: true, owner: 'other@example.com' }
+
+    global.fetch.mockImplementation((url, opts) => {
+      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+        // verify the component included the current user's email in the query
+        expect(url).toContain(encodeURIComponent('test@example.com'))
+        // simulate server-side filtering: return only the current user's resources
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([mine]) })
+      }
+      return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
+    })
+
+    render(
+      <BrowserRouter>
+        <MyResources />
+      </BrowserRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText('Mine')).toBeInTheDocument())
+    expect(screen.queryByText('Theirs')).toBeNull()
+  })
+})
