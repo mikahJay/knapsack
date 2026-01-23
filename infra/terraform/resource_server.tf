@@ -14,7 +14,7 @@ resource "aws_ecs_task_definition" "resource_server" {
   container_definitions = jsonencode([
     {
       name      = "resource-server"
-      image     = "${aws_ecr_repository.resource_server.repository_url}:latest"
+      image     = "${aws_ecr_repository.resource_server.repository_url}:${var.image_tag}"
       essential = true
       portMappings = [
         { containerPort = 4010, protocol = "tcp" }
@@ -37,6 +37,11 @@ resource "aws_ecs_task_definition" "resource_server" {
         {
           name  = "DB_NAME"
           value = aws_db_instance.knapsack.db_name
+        }
+        ,
+        {
+          name  = "GOOGLE_CLIENT_ID"
+          value = var.google_client_id
         }
       ]
       logConfiguration = {

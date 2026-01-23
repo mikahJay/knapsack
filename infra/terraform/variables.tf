@@ -34,3 +34,15 @@ variable "db_instance_class" {
   type        = string
   default     = "db.t3.micro"
 }
+
+variable "google_client_id" {
+  description = "Google OAuth client ID for verifying ID tokens in resource-server"
+  type        = string
+  default     = ""
+}
+
+variable "image_tag" {
+  description = "Image tag to deploy for services (resource-server, need-server, etc.)"
+  type        = string
+  default     = "latest"
+}

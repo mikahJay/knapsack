@@ -12,7 +12,14 @@ app.use(bodyParser.json())
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  // echo requested headers (if provided) so proxies/ALBs see Authorization allowed
+  const reqHeaders = req.headers['access-control-request-headers']
+  if (reqHeaders) {
+    res.setHeader('Access-Control-Allow-Headers', reqHeaders)
+  } else {
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
 })

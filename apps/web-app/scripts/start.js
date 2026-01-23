@@ -30,14 +30,17 @@ async function main() {
     env.VITE_API_NEED = `${VITE_API_BASE}/need`
     env.VITE_API_RESOURCE = `${VITE_API_BASE}/resource`
     env.VITE_API_AUTH = `${VITE_API_BASE}/auth`
+    env.VITE_API_BASE = VITE_API_BASE
   } else {
     // local ports for services
     env.VITE_API_NEED = 'http://localhost:4020/need'
     env.VITE_API_RESOURCE = 'http://localhost:4010/resource'
     env.VITE_API_AUTH = 'http://localhost:4001/auth'
+    env.VITE_API_BASE = 'http://localhost:5173'
   }
 
   console.log('Starting Vite with:')
+  console.log('  VITE_API_BASE=', env.VITE_API_BASE)
   console.log('  VITE_API_NEED=', env.VITE_API_NEED)
   console.log('  VITE_API_RESOURCE=', env.VITE_API_RESOURCE)
   console.log('  VITE_API_AUTH=', env.VITE_API_AUTH)
