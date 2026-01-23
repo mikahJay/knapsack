@@ -44,8 +44,11 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'knapsack',
   user: dbCreds.username || process.env.DB_USER,
   password: dbCreds.password || process.env.DB_PASSWORD,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  // Force SSL for RDS connections in VPC. Log DB_SSL for debugging.
+  ssl: { rejectUnauthorized: false },
 })
+
+console.log('DB_SSL env:', process.env.DB_SSL)
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID || null
 const oauth2Client = googleClientId ? new OAuth2Client(googleClientId) : null

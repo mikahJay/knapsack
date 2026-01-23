@@ -40,6 +40,10 @@ resource "aws_ecs_task_definition" "resource_server" {
         }
         ,
         {
+          name  = "DB_SSL"
+          value = "true"
+        },
+        {
           name  = "GOOGLE_CLIENT_ID"
           value = var.google_client_id
         }
