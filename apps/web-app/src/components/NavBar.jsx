@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getUser, setUser, clearUser, fetchGoogleProfile, buildGoogleAuthUrl } from '../utils/auth'
 
 export default function NavBar(){
@@ -81,12 +81,15 @@ export default function NavBar(){
     return ()=> window.removeEventListener('message', onMessage)
   }, [])
 
+  const navigate = useNavigate()
+
   function handleLogout(e){
     e.preventDefault()
     clearUser()
     setUserState(null)
     try{ sessionStorage.removeItem('knapsack_id_token'); sessionStorage.removeItem('knapsack_access_token') }catch(e){}
-    location.reload()
+    // navigate back to home and remove My Resources from view
+    navigate('/')
   }
 
   function handleLogin(e){

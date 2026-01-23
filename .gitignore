@@ -15,3 +15,5 @@ build/
 *.tfstate
 *.tfstate.backup
 infra/terraform/data_secrets.tf
+# Ignore coverage reports produced by local test runs
+apps/web-app/coverage/

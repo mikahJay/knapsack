@@ -16,9 +16,11 @@ app.use((req, res, next) => {
   } else {
     res.setHeader('Access-Control-Allow-Origin', '*')
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  // Always allow Authorization and common headers to avoid preflight failures
-  const allowedHeaders = 'Content-Type, Authorization, X-Requested-With, Accept'
+  // Allow common HTTP methods; include PATCH and HEAD for completeness
+  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS')
+  // Echo requested headers when present to avoid preflight mismatches (ensures Authorization is allowed)
+  const reqHeaders = req.headers['access-control-request-headers']
+  const allowedHeaders = reqHeaders && typeof reqHeaders === 'string' ? reqHeaders : 'Content-Type, Authorization, X-Requested-With, Accept'
   res.setHeader('Access-Control-Allow-Headers', allowedHeaders)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Max-Age', '600')

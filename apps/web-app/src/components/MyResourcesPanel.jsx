@@ -115,11 +115,51 @@ export default function MyResourcesPanel(){
             </thead>
             <tbody>
               {items.map(it => (
-                <tr key={it.id}>
+                <tr key={it.id} style={{ color: it.public ? 'darkgreen' : 'inherit' }}>
                   <td>{it.name}</td>
                   <td>{it.description}</td>
                   <td>{it.quantity}</td>
-                  <td>{it.public ? 'yes' : 'no'}</td>
+                    <td>
+                      <a
+                        href="#"
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          const newPublic = !it.public
+                          // optimistic UI update
+                          setItems(prev => prev.map(p => p.id === it.id ? { ...p, public: newPublic } : p))
+                          try{
+                            const url = `${API_BASE}/resources/${it.id}`
+                            const body = JSON.stringify({
+                              name: it.name,
+                              description: it.description,
+                              quantity: it.quantity,
+                              public: newPublic,
+                              attributes: it.attributes || {},
+                              owner: it.owner
+                            })
+                            const res = await fetch(url, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body
+                            })
+                            if(!res.ok){
+                              const text = await res.text().catch(()=>'<no body>')
+                              throw new Error(`status=${res.status} body=${text}`)
+                            }
+                            const updated = await res.json()
+                            setItems(prev => prev.map(p => p.id === it.id ? updated : p))
+                          }catch(err){
+                            // revert optimistic update
+                            console.error('toggle public failed', { id: it.id, err })
+                            setItems(prev => prev.map(p => p.id === it.id ? { ...p, public: it.public } : p))
+                            setStatus('error')
+                          }
+                        }}
+                        style={{ color: it.public ? 'darkgreen' : 'black', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {it.public ? 'Public' : 'Private'}
+                      </a>
+                    </td>
                 </tr>
               ))}
             </tbody>

@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import MyResources from '../src/pages/MyResources'
 import MyResourcesPanel from '../src/components/MyResourcesPanel'
 import { BrowserRouter } from 'react-router-dom'
@@ -104,5 +104,39 @@ describe('MyResources page', () => {
 
     await waitFor(() => expect(screen.getByText('Mine')).toBeInTheDocument())
     expect(screen.queryByText('Theirs')).toBeNull()
+  })
+
+  test('toggles public flag and updates UI color/text', async () => {
+    const initial = { id: '1', name: 'ToggleMe', description: '', quantity: 1, public: false, owner: 'test@example.com' }
+    let putCalled = false
+
+    global.fetch.mockImplementation((url, opts) => {
+      if (opts && opts.method === 'PUT') {
+        const body = JSON.parse(opts.body)
+        expect(body.public).toBe(true)
+        putCalled = true
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...initial, public: true }) })
+      }
+      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([initial]) })
+      }
+      return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
+    })
+
+    render(
+      <BrowserRouter>
+        <MyResourcesPanel />
+      </BrowserRouter>
+    )
+
+    await waitFor(() => expect(screen.getByText('ToggleMe')).toBeInTheDocument())
+    const row = screen.getByText('ToggleMe').closest('tr')
+    const rowWithin = within(row)
+    const toggleLink = rowWithin.getByRole('link')
+    // initial should reflect current state (Private or Public)
+    fireEvent.click(toggleLink)
+    await waitFor(() => expect(rowWithin.getByRole('link').textContent).toBe('Public'))
+    expect(row.style.color).toBe('darkgreen')
+    expect(putCalled).toBe(true)
   })
 })
