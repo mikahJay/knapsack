@@ -49,8 +49,10 @@ app.get('/resources', async (req, res) => {
   }
 
   if (search) {
-    filters.push(`to_tsvector('english', coalesce(name,'') || ' ' || coalesce(description,'') || ' ' || coalesce(attributes::text,'')) @@ plainto_tsquery($${values.length + 1})`)
-    values.push(search)
+    // build a prefix tsquery so short partial terms match (e.g., 'mon' -> 'mon:*')
+    const terms = String(search).trim().split(/\s+/).map(t => t.replace(/'/g, "\\'") + ':*').join(' & ')
+    filters.push(`to_tsvector('english', coalesce(name,'') || ' ' || coalesce(description,'') || ' ' || coalesce(attributes::text,'')) @@ to_tsquery($${values.length + 1})`)
+    values.push(terms)
   }
 
   // support attributes filtering via query params attr.<key>=value
