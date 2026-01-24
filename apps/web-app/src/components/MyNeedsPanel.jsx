@@ -1,0 +1,160 @@
+import React, { useState } from 'react'
+import { getUser, buildGoogleAuthUrl } from '../utils/auth'
+
+function SlideDown({ open, children }) {
+  return (
+    <div style={{
+      maxHeight: open ? '600px' : '0px',
+      overflow: 'hidden',
+      transition: 'max-height 300ms ease-in-out'
+    }}>
+      {children}
+    </div>
+  )
+}
+
+export default function MyNeedsPanel(){
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
+  const [status, setStatus] = useState(null)
+
+  const API_BASE = import.meta.env.VITE_API_NEED || import.meta.env.VITE_API_BASE || ''
+  const [items, setItems] = useState([])
+
+  async function fetchMyNeeds(){
+    const user = getUser()
+    if(!user || !user.email) return setItems([])
+    try{
+      const res = await fetch(`${API_BASE}/needs?owner=${encodeURIComponent(user.email)}`)
+      if(!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      setItems(data)
+    }catch(err){ console.error('fetch my needs', err) }
+  }
+
+  React.useEffect(()=>{ fetchMyNeeds() }, [])
+
+  async function handleSubmit(e){
+    e.preventDefault()
+    setStatus('saving')
+    const user = getUser()
+    const payload = {
+      name,
+      description,
+      quantity: quantity ? Number(quantity) : null,
+      public: isPublic,
+      attributes: {},
+      owner: user ? (user.email || user.name) : null
+    }
+    try {
+        const headers = { 'Content-Type': 'application/json' }
+        const idToken = sessionStorage.getItem('knapsack_id_token')
+        if(idToken) headers['Authorization'] = `Bearer ${idToken}`
+        const res = await fetch(`${API_BASE}/needs`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        })
+      if(!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      setStatus('saved')
+      fetchMyNeeds()
+      setName('')
+      setDescription('')
+      setQuantity('')
+      setIsPublic(false)
+    } catch(err){
+      setStatus('error')
+      console.error(err)
+    }
+  }
+
+  return (
+    <div>
+      <button className="btn btn-primary" onClick={() => setOpen(o => !o)}>{open ? 'Close' : 'Create Need'}</button>
+      <SlideDown open={open}>
+        <div className="card mt-3 p-3">
+          <form onSubmit={handleSubmit}>
+            <div className="mb-2">
+              <label className="form-label">Name</label>
+              <input className="form-control" value={name} onChange={e => setName(e.target.value)} required />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Description</label>
+              <textarea className="form-control" value={description} onChange={e => setDescription(e.target.value)} />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Quantity</label>
+              <input type="number" step="any" min="0" className="form-control" value={quantity} onChange={e => setQuantity(e.target.value)} />
+            </div>
+            <div className="form-check mb-2">
+              <input className="form-check-input" type="checkbox" id="publicCheck" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
+              <label className="form-check-label" htmlFor="publicCheck">Public</label>
+            </div>
+            <div className="mt-3">
+              <button className="btn btn-success" type="submit">Submit</button>
+              {status === 'saving' && <span className="ms-2">Saving…</span>}
+              {status === 'saved' && <span className="ms-2 text-success">Saved</span>}
+              {status === 'error' && <span className="ms-2 text-danger">Error</span>}
+            </div>
+          </form>
+        </div>
+      </SlideDown>
+      <div className="mt-4">
+        <h5>My needs</h5>
+        {items.length === 0 && <div className="text-muted">No needs yet</div>}
+        {items.length > 0 && (
+          <table className="table table-sm">
+            <thead>
+              <tr><th>Name</th><th>Description</th><th>Qty</th><th>Public</th></tr>
+            </thead>
+            <tbody>
+              {items.map(it => (
+                <tr key={it.id} style={{ color: it.public ? 'darkgreen' : 'inherit' }}>
+                  <td>{it.name}</td>
+                  <td>{it.description}</td>
+                  <td>{it.quantity}</td>
+                    <td>
+                      <a
+                        href="#"
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          const newPublic = !it.public
+                          setItems(prev => prev.map(p => p.id === it.id ? { ...p, public: newPublic } : p))
+                          try{
+                            const url = `${API_BASE}/needs/${it.id}/toggle-public`
+                            const body = JSON.stringify({ public: newPublic })
+                            const res = await fetch(url, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body
+                            })
+                            if(!res.ok){
+                              const text = await res.text().catch(()=>'<no body>')
+                              throw new Error(`status=${res.status} body=${text}`)
+                            }
+                            const updated = await res.json()
+                            setItems(prev => prev.map(p => p.id === it.id ? updated : p))
+                          }catch(err){
+                            console.error('toggle public failed', { id: it.id, err })
+                            setItems(prev => prev.map(p => p.id === it.id ? { ...p, public: it.public } : p))
+                            setStatus('error')
+                          }
+                        }}
+                        style={{ color: it.public ? 'darkgreen' : 'black', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {it.public ? 'Public' : 'Private'}
+                      </a>
+                    </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}

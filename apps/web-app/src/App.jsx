@@ -4,6 +4,7 @@ import NavBar from './components/NavBar'
 import Home from './pages/Home'
 import About from './pages/About'
 import MyResources from './pages/MyResources'
+import MyNeeds from './pages/MyNeeds'
 
 export default function App(){
   return (
@@ -13,6 +14,7 @@ export default function App(){
         <Route path="/" element={<Home/>} />
         <Route path="/about" element={<About/>} />
         <Route path="/my-resources" element={<MyResources/>} />
+        <Route path="/my-needs" element={<MyNeeds/>} />
       </Routes>
     </BrowserRouter>
   )

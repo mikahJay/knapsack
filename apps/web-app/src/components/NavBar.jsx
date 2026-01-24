@@ -119,6 +119,11 @@ export default function NavBar(){
                 <Link className="nav-link" to="/my-resources">My Resources</Link>
               </li>
             )}
+            {user && (
+              <li className="nav-item">
+                <Link className="nav-link" to="/my-needs">My Needs</Link>
+              </li>
+            )}
           </ul>
 
           <div className="d-flex align-items-center">
