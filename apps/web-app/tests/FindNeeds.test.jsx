@@ -23,8 +23,9 @@ describe('Find Needs', () => {
     fireEvent.click(screen.getByText('Search'))
 
     await waitFor(() => expect(screen.getByText('PubNeed')).toBeInTheDocument())
-    expect(screen.getByText('MyNeed')).toBeInTheDocument()
+    const mineEl = screen.getByText(/MyNeed/)
+    expect(mineEl).toBeInTheDocument()
     expect(screen.queryByText('PrivateNeed')).toBeNull()
-    expect(screen.getByText('MyNeed').textContent).toContain('(mine)')
+    expect(mineEl.textContent).toContain('(mine)')
   })
 })

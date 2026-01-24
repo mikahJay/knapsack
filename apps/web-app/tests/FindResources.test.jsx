@@ -24,9 +24,10 @@ describe('Find Resources', () => {
     fireEvent.click(screen.getByText('Search'))
 
     await waitFor(() => expect(screen.getByText('Pub')).toBeInTheDocument())
-    expect(screen.getByText('PrivMine')).toBeInTheDocument()
+    const mineEl = screen.getByText(/PrivMine/)
+    expect(mineEl).toBeInTheDocument()
     expect(screen.queryByText('Priv')).toBeNull()
     // owned is marked
-    expect(screen.getByText('PrivMine').textContent).toContain('(mine)')
+    expect(mineEl.textContent).toContain('(mine)')
   })
 })

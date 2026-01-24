@@ -52,14 +52,21 @@ export default function FindResourcesPanel(){
         {items.length === 0 && <div className="text-muted">No results</div>}
         {items.length > 0 && (
           <ul className="list-group">
-            {items.map(it => (
-              <li key={it.id} className="list-group-item">
-                <span style={{ fontStyle: (getUser() && getUser().email === it.owner) ? 'italic' : 'normal' }}>
-                  {it.name}{getUser() && getUser().email === it.owner ? ' (mine)' : ''}
-                </span>
-                <div className="text-muted small">{it.description}</div>
-              </li>
-            ))}
+            {items.map(it => {
+              const user = getUser()
+              const isMine = user && user.email === it.owner
+              const date = it.created_at || it.updated_at || it.date
+              const dateStr = date ? (new Date(date)).toLocaleDateString() : ''
+              return (
+                <li key={it.id} className="list-group-item">
+                  <div>
+                    <strong>{it.name}{isMine ? ' (mine)' : ''}</strong>
+                  </div>
+                  <div className="text-muted small">{it.description}</div>
+                  <div className="text-muted small">Offered by: {it.owner}{dateStr ? `, ${dateStr}` : ''}</div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

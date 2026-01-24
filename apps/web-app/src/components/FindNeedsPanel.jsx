@@ -6,16 +6,12 @@ export default function FindNeedsPanel(){
   const API_BASE = import.meta.env.VITE_API_NEED || import.meta.env.VITE_API_BASE || ''
   const [items, setItems] = useState([])
   const [status, setStatus] = useState(null)
-  const [lastUrl, setLastUrl] = useState('')
-  const [lastError, setLastError] = useState(null)
 
   async function doSearch(e){
     if(e) e.preventDefault()
     setStatus('searching')
     try{
       const url = `${API_BASE}/needs?search=${encodeURIComponent(query)}`
-      setLastUrl(url)
-      setLastError(null)
       console.debug('FindNeedsPanel: fetching', url)
       const res = await fetch(url)
       if(!res.ok) throw new Error(await res.text())
@@ -27,8 +23,6 @@ export default function FindNeedsPanel(){
       setStatus(null)
     }catch(err){
       console.error('search needs', err)
-      const msg = err && err.message ? err.message : String(err)
-      setLastError(msg)
       setStatus('error')
     }
   }
@@ -43,22 +37,25 @@ export default function FindNeedsPanel(){
       </form>
       {status === 'searching' && <div>Searching…</div>}
       {status === 'error' && <div className="text-danger">Error</div>}
-      <div className="mt-2 text-muted small">
-        {lastUrl && <div>URL: {lastUrl}</div>}
-        {lastError && <div className="text-danger">Error: {lastError}</div>}
-      </div>
       <div>
         {items.length === 0 && <div className="text-muted">No results</div>}
         {items.length > 0 && (
           <ul className="list-group">
-            {items.map(it => (
-              <li key={it.id} className="list-group-item">
-                <span style={{ fontStyle: (getUser() && getUser().email === it.owner) ? 'italic' : 'normal' }}>
-                  {it.name}{getUser() && getUser().email === it.owner ? ' (mine)' : ''}
-                </span>
-                <div className="text-muted small">{it.description}</div>
-              </li>
-            ))}
+            {items.map(it => {
+              const user = getUser()
+              const isMine = user && user.email === it.owner
+              const date = it.created_at || it.updated_at || it.date
+              const dateStr = date ? (new Date(date)).toLocaleDateString() : ''
+              return (
+                <li key={it.id} className="list-group-item">
+                  <div>
+                    <strong>{it.name}{isMine ? ' (mine)' : ''}</strong>
+                  </div>
+                  <div className="text-muted small">{it.description}</div>
+                  <div className="text-muted small">Needed by: {it.owner}{dateStr ? `, ${dateStr}` : ''}</div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
