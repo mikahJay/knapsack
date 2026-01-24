@@ -2,7 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const { Pool } = require('pg')
 const format = require('pg-format')
-const { OAuth2Client } = require('google-auth-library')
+const { authOptional, authRequired } = require('./auth')
 const app = express()
 const port = process.env.PORT || 4010
 
@@ -28,142 +28,7 @@ app.use((req, res, next) => {
   next()
 })
 
-function parseDbCredentials() {
-  const raw = process.env.DB_CREDENTIALS || '{}'
-  try {
-    return JSON.parse(raw)
-  } catch (e) {
-    return {}
-  }
-}
-
-const dbCreds = parseDbCredentials()
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-  database: process.env.DB_NAME || 'knapsack',
-  user: dbCreds.username || process.env.DB_USER,
-  password: dbCreds.password || process.env.DB_PASSWORD,
-  // Force SSL for RDS connections in VPC. Log DB_SSL for debugging.
-  ssl: { rejectUnauthorized: false },
-})
-
-console.log('DB_SSL env:', process.env.DB_SSL)
-
-const googleClientId = process.env.GOOGLE_CLIENT_ID || null
-const oauth2Client = googleClientId ? new OAuth2Client(googleClientId) : null
-
-async function verifyIdToken(idToken){
-  if(!oauth2Client) throw new Error('GOOGLE_CLIENT_ID not configured')
-  const ticket = await oauth2Client.verifyIdToken({ idToken, audience: googleClientId })
-  return ticket.getPayload()
-}
-
-// middleware: if Authorization: Bearer <id_token> header present, verify and attach req.user
-async function authOptional(req, res, next){
-  const auth = req.headers.authorization || ''
-  if(!auth) return next()
-  const m = auth.match(/^Bearer (.+)$/)
-  if(!m) return res.status(400).json({ error: 'invalid authorization header' })
-  const token = m[1]
-  try{
-    const payload = await verifyIdToken(token)
-    // minimal user object
-    req.user = { email: payload.email, name: payload.name, sub: payload.sub }
-    return next()
-  }catch(err){
-    console.error('id token verify failed', err && err.message)
-    return res.status(401).json({ error: 'invalid id_token' })
-  }
-}
-
-async function authRequired(req, res, next){
-  const auth = req.headers.authorization || ''
-  const m = auth.match(/^Bearer (.+)$/)
-  if(!m) return res.status(401).json({ error: 'missing or invalid authorization header' })
-  const token = m[1]
-  try{
-    const payload = await verifyIdToken(token)
-    req.user = { email: payload.email, name: payload.name, sub: payload.sub }
-    return next()
-  }catch(err){
-    console.error('id token verify failed', err && err.message)
-    return res.status(401).json({ error: 'invalid id_token' })
-  }
-}
-
-async function runMigrations() {
-  const client = await pool.connect()
-  try {
-    // extensions
-    await client.query("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-
-    // resources table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS resources (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        name text NOT NULL,
-        owner text,
-        description text,
-        quantity numeric CHECK (quantity > 0),
-        public boolean DEFAULT false,
-        attributes jsonb,
-        created_at timestamptz DEFAULT now(),
-        updated_at timestamptz DEFAULT now()
-      );
-    `)
-
-    // ensure owner column exists for older deployments
-    await client.query(`ALTER TABLE resources ADD COLUMN IF NOT EXISTS owner text;`)
-
-    // indexes for JSONB and full-text search
-    await client.query(`CREATE INDEX IF NOT EXISTS resources_attrs_idx ON resources USING GIN (attributes);`)
-    await client.query(`CREATE INDEX IF NOT EXISTS resources_fulltext_idx ON resources USING GIN (to_tsvector('english', coalesce(name,'') || ' ' || coalesce(description,'') || ' ' || coalesce(attributes::text,'')));`)
-    await client.query(`CREATE INDEX IF NOT EXISTS resources_owner_idx ON resources (owner);`)
-
-    // trigger to update updated_at
-    await client.query(`
-      CREATE OR REPLACE FUNCTION trigger_set_timestamp()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = now();
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-    `)
-
-    await client.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_timestamp') THEN
-          CREATE TRIGGER set_timestamp
-          BEFORE UPDATE ON resources
-          FOR EACH ROW
-          EXECUTE PROCEDURE trigger_set_timestamp();
-        END IF;
-      END$$;
-    `)
-  } finally {
-    client.release()
-  }
-}
-
-// retry connecting and run migrations
-async function initDb() {
-  const max = 30
-  for (let i = 0; i < max; i++) {
-    try {
-      await pool.query('SELECT 1')
-      await runMigrations()
-      console.log('Database connected and migrations applied')
-      return
-    } catch (err) {
-      console.log('Waiting for DB...', err.message)
-      await new Promise(r => setTimeout(r, 2000))
-    }
-  }
-  throw new Error('Could not connect to database')
-}
+const { pool, initDb } = require('./db')
 
 app.get('/', (req, res) => res.sendStatus(200))
 
@@ -304,9 +169,15 @@ app.delete('/resources/:id', async (req, res) => {
   }
 })
 
-initDb().then(() => {
-  app.listen(port, () => console.log(`resource-server listening on ${port}`))
-}).catch(err => {
-  console.error('Failed to initialize DB:', err.message)
-  process.exit(1)
-})
+// Only start the server when run directly. This allows importing `app` in tests
+// and mocking `pg` before the module initializes.
+if (require.main === module) {
+  initDb().then(() => {
+    app.listen(port, () => console.log(`resource-server listening on ${port}`))
+  }).catch(err => {
+    console.error('Failed to initialize DB:', err.message)
+    process.exit(1)
+  })
+}
+
+module.exports = { app, initDb, pool }
