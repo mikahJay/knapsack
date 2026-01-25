@@ -16,3 +16,7 @@ resource "aws_ecr_repository" "need_server" {
 resource "aws_ecr_repository" "matcher" {
   name = "matcher-${var.environment}"
 }
+
+resource "aws_ecr_repository" "web_app" {
+  name = "web-app-${var.environment}"
+}

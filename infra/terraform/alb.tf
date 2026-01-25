@@ -88,6 +88,23 @@ resource "aws_lb_target_group" "auth_server_tg" {
   }
 }
 
+resource "aws_lb_target_group" "web_app_tg" {
+  name        = "web-app-tg-${var.environment}"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.knapsack.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.alb.arn
   port              = "80"
@@ -129,6 +146,21 @@ resource "aws_lb_listener_rule" "auth_path" {
   }
 }
 
+resource "aws_lb_listener_rule" "web_path" {
+  listener_arn = aws_lb_listener.http.arn
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web_app_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/", "/*"]
+    }
+  }
+}
+
 // Allow ALB to reach service container ports
 resource "aws_security_group_rule" "alb_to_service_need" {
   type                     = "ingress"
@@ -152,6 +184,15 @@ resource "aws_security_group_rule" "alb_to_service_auth" {
   type                     = "ingress"
   from_port                = 4001
   to_port                  = 4001
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.service_sg.id
+  source_security_group_id = aws_security_group.alb_sg.id
+}
+
+resource "aws_security_group_rule" "alb_to_service_web" {
+  type                     = "ingress"
+  from_port                = 80
+  to_port                  = 80
   protocol                 = "tcp"
   security_group_id        = aws_security_group.service_sg.id
   source_security_group_id = aws_security_group.alb_sg.id
