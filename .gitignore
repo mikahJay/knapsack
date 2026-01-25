@@ -17,3 +17,6 @@ build/
 infra/terraform/data_secrets.tf
 # Ignore coverage reports produced by local test runs
 apps/web-app/coverage/
+# Generated sample data
+scripts/sample_resources.json
+scripts/sample_needs.json
