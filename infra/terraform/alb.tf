@@ -10,7 +10,7 @@ resource "aws_security_group" "alb_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = concat([aws_vpc.knapsack.cidr_block], var.allowed_alb_cidr_blocks)
   }
 
   egress {

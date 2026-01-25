@@ -52,3 +52,9 @@ variable "allowed_db_cidr_blocks" {
   type        = list(string)
   default     = []
 }
+
+variable "allowed_alb_cidr_blocks" {
+  description = "Extra CIDR blocks allowed to access the ALB (in addition to the VPC CIDR). Use this to whitelist developer IPs."
+  type        = list(string)
+  default     = []
+}
