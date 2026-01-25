@@ -22,6 +22,18 @@ resource "aws_ecs_task_definition" "web_app" {
         {
           name  = "NODE_ENV"
           value = "production"
+        },
+        {
+          name  = "VITE_API_NEED"
+          value = "http://${aws_lb.alb.dns_name}/need"
+        },
+        {
+          name  = "VITE_API_RESOURCE"
+          value = "http://${aws_lb.alb.dns_name}/resources"
+        },
+        {
+          name  = "VITE_API_AUTH"
+          value = "http://${aws_lb.alb.dns_name}/auth"
         }
       ]
       logConfiguration = {
