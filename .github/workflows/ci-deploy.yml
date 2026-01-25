@@ -2,7 +2,7 @@ name: CI / Build & Deploy
 
 on:
   push:
-    branches: [ deploy ]
+    branches: [ main, deploy ]
   workflow_dispatch: {}
 
 jobs:
@@ -61,6 +61,12 @@ jobs:
             -target=aws_vpc_endpoint.secretsmanager \
             -auto-approve || echo "network apply exited non-zero"
 
+      - name: Export ALB DNS for builds
+        run: |
+          ALB=$(terraform -chdir=infra/terraform output -raw alb_dns_name)
+          echo "ALB_DNS=$ALB" >> $GITHUB_ENV
+          echo "ALB_DNS set to $ALB"
+
   deploy:
     name: Build & Deploy services
     needs: prepare
@@ -104,6 +110,10 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
+          build-args: |
+            VITE_API_NEED=http://${{ env.ALB_DNS }}/need
+            VITE_API_RESOURCE=http://${{ env.ALB_DNS }}/resources
+            VITE_API_AUTH=http://${{ env.ALB_DNS }}/auth
           tags: |
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:${{ github.sha }}
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest
