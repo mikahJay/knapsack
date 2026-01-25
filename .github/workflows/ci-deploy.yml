@@ -9,6 +9,8 @@ jobs:
   prepare:
     name: Prepare infra & repos
     runs-on: ubuntu-latest
+    outputs:
+      alb_dns: ${{ steps.export_alb.outputs.alb_dns }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,15 +64,16 @@ jobs:
             -auto-approve || echo "network apply exited non-zero"
 
       - name: Export ALB DNS for builds
+        id: export_alb
         run: |
           set -euo pipefail
-          # Terraform may emit non-DNS debug lines to stdout via wrapper; capture stderr and sanitize
           ALB_RAW=$(terraform -chdir=infra/terraform output -raw alb_dns_name 2>/dev/null || true)
           ALB=$(printf "%s\n" "$ALB_RAW" | grep -oE '([a-z0-9-]+\.elb\.amazonaws\.com)' | head -n1 || true)
           if [ -z "${ALB}" ]; then
+            echo "alb_dns=" >> $GITHUB_OUTPUT
             echo "Warning: ALB_DNS not found from terraform output" >&2
           else
-            echo "ALB_DNS=${ALB}" >> $GITHUB_ENV
+            echo "alb_dns=${ALB}" >> $GITHUB_OUTPUT
             echo "ALB_DNS set to ${ALB}"
           fi
 
@@ -118,9 +121,9 @@ jobs:
           context: ${{ matrix.context }}
           push: true
           build-args: |
-            VITE_API_NEED=http://${{ env.ALB_DNS }}/need
-            VITE_API_RESOURCE=http://${{ env.ALB_DNS }}/resources
-            VITE_API_AUTH=http://${{ env.ALB_DNS }}/auth
+            VITE_API_NEED=http://${{ needs.prepare.outputs.alb_dns }}/need
+            VITE_API_RESOURCE=http://${{ needs.prepare.outputs.alb_dns }}/resources
+            VITE_API_AUTH=http://${{ needs.prepare.outputs.alb_dns }}/auth
           tags: |
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:${{ github.sha }}
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest
