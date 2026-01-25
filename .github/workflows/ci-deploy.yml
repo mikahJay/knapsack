@@ -63,9 +63,16 @@ jobs:
 
       - name: Export ALB DNS for builds
         run: |
-          ALB=$(terraform -chdir=infra/terraform output -raw alb_dns_name)
-          echo "ALB_DNS=$ALB" >> $GITHUB_ENV
-          echo "ALB_DNS set to $ALB"
+          set -euo pipefail
+          # Terraform may emit non-DNS debug lines to stdout via wrapper; capture stderr and sanitize
+          ALB_RAW=$(terraform -chdir=infra/terraform output -raw alb_dns_name 2>/dev/null || true)
+          ALB=$(printf "%s\n" "$ALB_RAW" | grep -oE '([a-z0-9-]+\.elb\.amazonaws\.com)' | head -n1 || true)
+          if [ -z "${ALB}" ]; then
+            echo "Warning: ALB_DNS not found from terraform output" >&2
+          else
+            echo "ALB_DNS=${ALB}" >> $GITHUB_ENV
+            echo "ALB_DNS set to ${ALB}"
+          fi
 
   deploy:
     name: Build & Deploy services
