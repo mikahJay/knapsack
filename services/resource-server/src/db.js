@@ -31,7 +31,7 @@ async function runMigrations() {
     // resources table
     await client.query(`
       CREATE TABLE IF NOT EXISTS resources (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id text PRIMARY KEY DEFAULT encode(gen_random_bytes(8), 'hex'),
         name text NOT NULL,
         owner text,
         description text,
