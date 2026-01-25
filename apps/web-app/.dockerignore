@@ -3,4 +3,4 @@ dist
 .git
 *.log
 Dockerfile
-nginx.conf
+# keep nginx.conf in context so Docker can copy it
