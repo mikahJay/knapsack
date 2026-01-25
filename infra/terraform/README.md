@@ -36,3 +36,21 @@ Usage (local):
  - `terraform init`
  - `terraform plan -var="environment=test"`
  - `terraform apply -var="environment=test"`
+
+## Postgres database notes
+
+Only connectivity is through the "bastion" (an EC2) instance, via SSM, from machines designated by IP in bastion.tf. A sample command from that bastion:
+
+```
+sh-4.2$ psql -h "knapsack-test.ch6aw4ss271j.us-east-2.rds.amazonaws.com" -U knapsack -p 5432 sslmode=require
+```
+
+Then once connected:
+
+```
+knapsack=> select count(0) from needs;
+ count
+-------
+  1001
+(1 row)
+```

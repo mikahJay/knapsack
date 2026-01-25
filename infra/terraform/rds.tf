@@ -23,7 +23,18 @@ resource "aws_security_group" "rds_sg" {
     from_port                = 5432
     to_port                  = 5432
     protocol                 = "tcp"
-    security_groups          = [aws_security_group.service_sg.id]
+    security_groups          = [aws_security_group.service_sg.id, aws_security_group.bastion.id]
+  }
+
+  dynamic "ingress" {
+    for_each = var.allowed_db_cidr_blocks
+    content {
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "Allowed DB access CIDR"
+    }
   }
 
   egress {
@@ -48,6 +59,8 @@ resource "aws_db_instance" "knapsack" {
   password                = random_password.db_master.result
   db_subnet_group_name    = aws_db_subnet_group.knapsack.name
   vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+  # Enable IAM DB authentication so AWS Console Query Editor can connect using IAM
+  iam_database_authentication_enabled = true
   skip_final_snapshot     = true
   publicly_accessible     = false
   apply_immediately       = true

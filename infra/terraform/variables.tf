@@ -46,3 +46,9 @@ variable "image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "allowed_db_cidr_blocks" {
+  description = "Optional extra CIDR blocks allowed to access the RDS instance (useful for CloudShell or office IPs)"
+  type        = list(string)
+  default     = []
+}
