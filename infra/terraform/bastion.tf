@@ -1,6 +1,6 @@
 // Bastion instance for in-VPC access via SSM (no public IP)
 resource "aws_iam_role" "bastion_ssm_role" {
-  name = "knapsack-bastion-ssm-${var.environment}"
+  name               = "knapsack-bastion-ssm-${var.environment}"
   assume_role_policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -56,11 +56,11 @@ resource "aws_security_group" "bastion" {
 }
 
 resource "aws_instance" "bastion" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.public[0].id
-  iam_instance_profile   = aws_iam_instance_profile.bastion_profile.name
-  vpc_security_group_ids = [aws_security_group.bastion.id]
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = "t3.micro"
+  subnet_id                   = aws_subnet.public[0].id
+  iam_instance_profile        = aws_iam_instance_profile.bastion_profile.name
+  vpc_security_group_ids      = [aws_security_group.bastion.id]
   associate_public_ip_address = true
   tags = {
     Name = "knapsack-bastion-${var.environment}"
@@ -68,11 +68,11 @@ resource "aws_instance" "bastion" {
 }
 
 output "bastion_instance_id" {
-  value = aws_instance.bastion.id
+  value       = aws_instance.bastion.id
   description = "Instance id of the SSM-managed bastion"
 }
 
 output "bastion_public_ip" {
-  value = aws_instance.bastion.public_ip
+  value       = aws_instance.bastion.public_ip
   description = "Public IP of the bastion (for SSH)"
 }

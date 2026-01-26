@@ -1,5 +1,9 @@
 // Application Load Balancer + target groups to expose services
 
+locals {
+  effective_acm_arn = var.acm_certificate_arn != "" ? var.acm_certificate_arn : try(aws_acm_certificate.cert.arn, "")
+}
+
 resource "aws_security_group" "alb_sg" {
   name   = "knapsack-alb-sg-${var.environment}"
   vpc_id = aws_vpc.knapsack.id
@@ -9,6 +13,13 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = concat([aws_vpc.knapsack.cidr_block], var.allowed_alb_cidr_blocks)
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = concat([aws_vpc.knapsack.cidr_block], var.allowed_alb_cidr_blocks)
   }
@@ -113,6 +124,70 @@ resource "aws_lb_listener" "http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.need_server_tg.arn
+  }
+}
+
+# HTTPS listener (requires ACM certificate ARN via variable)
+resource "aws_lb_listener" "https" {
+  count             = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
+  load_balancer_arn = aws_lb.alb.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn   = local.effective_acm_arn
+  depends_on        = [aws_acm_certificate_validation.cert_validation]
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.need_server_tg.arn
+  }
+}
+
+# Duplicate listener rules for HTTPS if cert provided
+resource "aws_lb_listener_rule" "resource_path_https" {
+  count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.resource_server_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/resources*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "auth_path_https" {
+  count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.auth_server_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/auth*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "web_path_https" {
+  count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web_app_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/", "/*"]
+    }
   }
 }
 

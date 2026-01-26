@@ -1,0 +1,27 @@
+{
+  "Comment": "Add ACM DNS validation records for knap-sack.com to registrar-managed hosted zone",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "_bc48f259bc2087be3bc7444030ecedab.knap-sack.com.",
+        "Type": "CNAME",
+        "TTL": 60,
+        "ResourceRecords": [
+          { "Value": "_b6f376c65b509b7922e37e0ac93516d5.jkddzztszm.acm-validations.aws." }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "_8076d0d1bf78dc4e9fc3f9c5a0e18d8f.www.knap-sack.com.",
+        "Type": "CNAME",
+        "TTL": 60,
+        "ResourceRecords": [
+          { "Value": "_eafd5663b3dcc1931beb6c4bcc07fe03.jkddzztszm.acm-validations.aws." }
+        ]
+      }
+    }
+  ]
+}

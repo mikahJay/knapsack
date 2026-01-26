@@ -58,3 +58,21 @@ variable "allowed_alb_cidr_blocks" {
   type        = list(string)
   default     = []
 }
+
+variable "acm_certificate_arn" {
+  description = "ARN of an ACM certificate to attach to the ALB HTTPS listener. Leave empty to skip creating HTTPS listener."
+  type        = string
+  default     = ""
+}
+
+variable "domain_name" {
+  description = "Public domain name to manage for this environment (used to create Route53 zone and ACM certificate)."
+  type        = string
+  default     = "knap-sack.com"
+}
+
+variable "create_acm" {
+  description = "When true, create an ACM certificate for `domain_name` and validate via Route53."
+  type        = bool
+  default     = true
+}

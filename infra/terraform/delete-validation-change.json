@@ -1,0 +1,17 @@
+{
+  "Changes": [
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "_8076d0d1bf78dc4e9fc3f9c5a0e18d8f.www.knap-sack.com.",
+        "Type": "CNAME",
+        "TTL": 60,
+        "ResourceRecords": [
+          {
+            "Value": "_eafd5663b3dcc1931beb6c4bcc07fe03.jkddzztszm.acm-validations.aws."
+          }
+        ]
+      }
+    }
+  ]
+}

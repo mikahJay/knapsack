@@ -1,7 +1,7 @@
 // Networking scaffold: VPC, public subnets, IGW, route table, and a service security group.
 
 resource "aws_vpc" "knapsack" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
   tags = {
@@ -157,10 +157,10 @@ output "service_sg_id" {
 
 // VPC endpoints to allow private-subnet tasks to reach ECR and S3
 resource "aws_vpc_endpoint" "s3" {
-  vpc_id       = aws_vpc.knapsack.id
-  service_name = "com.amazonaws.${var.aws_region}.s3"
+  vpc_id            = aws_vpc.knapsack.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids = [for rt in [aws_route_table.private] : rt.id]
+  route_table_ids   = [for rt in [aws_route_table.private] : rt.id]
 
   tags = {
     Name = "knapsack-s3-endpoint-${var.environment}"
@@ -168,11 +168,11 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.ecr.api"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -181,11 +181,11 @@ resource "aws_vpc_endpoint" "ecr_api" {
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.ecr.dkr"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -195,21 +195,21 @@ resource "aws_vpc_endpoint" "ecr_dkr" {
 
 output "vpc_endpoint_ids" {
   value = {
-    s3      = aws_vpc_endpoint.s3.id
-    ecr_api = aws_vpc_endpoint.ecr_api.id
-    ecr_dkr = aws_vpc_endpoint.ecr_dkr.id
-    logs    = aws_vpc_endpoint.logs.id
+    s3             = aws_vpc_endpoint.s3.id
+    ecr_api        = aws_vpc_endpoint.ecr_api.id
+    ecr_dkr        = aws_vpc_endpoint.ecr_dkr.id
+    logs           = aws_vpc_endpoint.logs.id
     secretsmanager = aws_vpc_endpoint.secretsmanager.id
   }
 }
 
 // CloudWatch Logs interface endpoint so ECS tasks in private subnets can write logs
 resource "aws_vpc_endpoint" "logs" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.logs"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.logs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -219,11 +219,11 @@ resource "aws_vpc_endpoint" "logs" {
 
 // SSM VPC interface endpoints so instances in private subnets can reach SSM without NAT
 resource "aws_vpc_endpoint" "ssm" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.ssm"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.ssm"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -232,11 +232,11 @@ resource "aws_vpc_endpoint" "ssm" {
 }
 
 resource "aws_vpc_endpoint" "ssmmessages" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.ssmmessages"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.ssmmessages"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -245,11 +245,11 @@ resource "aws_vpc_endpoint" "ssmmessages" {
 }
 
 resource "aws_vpc_endpoint" "ec2messages" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.ec2messages"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.ec2messages"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -260,11 +260,11 @@ resource "aws_vpc_endpoint" "ec2messages" {
 // Interface endpoint for AWS Secrets Manager so tasks in private subnets
 // can retrieve secrets without requiring NAT / internet egress.
 resource "aws_vpc_endpoint" "secretsmanager" {
-  vpc_id            = aws_vpc.knapsack.id
-  service_name      = "com.amazonaws.${var.aws_region}.secretsmanager"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.service_sg.id]
+  vpc_id              = aws_vpc.knapsack.id
+  service_name        = "com.amazonaws.${var.aws_region}.secretsmanager"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.service_sg.id]
   private_dns_enabled = true
 
   tags = {

@@ -20,10 +20,10 @@ resource "aws_security_group" "rds_sg" {
   description = "Allow DB access from service SG"
 
   ingress {
-    from_port                = 5432
-    to_port                  = 5432
-    protocol                 = "tcp"
-    security_groups          = [aws_security_group.service_sg.id, aws_security_group.bastion.id]
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.service_sg.id, aws_security_group.bastion.id]
   }
 
   dynamic "ingress" {
@@ -50,20 +50,20 @@ resource "aws_security_group" "rds_sg" {
 }
 
 resource "aws_db_instance" "knapsack" {
-  identifier              = "knapsack-${var.environment}"
-  engine                  = "postgres"
-  instance_class          = var.db_instance_class
-  allocated_storage       = 20
-  db_name                 = "knapsack"
-  username                = var.db_username
-  password                = random_password.db_master.result
-  db_subnet_group_name    = aws_db_subnet_group.knapsack.name
-  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+  identifier             = "knapsack-${var.environment}"
+  engine                 = "postgres"
+  instance_class         = var.db_instance_class
+  allocated_storage      = 20
+  db_name                = "knapsack"
+  username               = var.db_username
+  password               = random_password.db_master.result
+  db_subnet_group_name   = aws_db_subnet_group.knapsack.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
   # Enable IAM DB authentication so AWS Console Query Editor can connect using IAM
   iam_database_authentication_enabled = true
-  skip_final_snapshot     = true
-  publicly_accessible     = false
-  apply_immediately       = true
+  skip_final_snapshot                 = true
+  publicly_accessible                 = false
+  apply_immediately                   = true
   tags = {
     Name = "knapsack-db-${var.environment}"
   }
@@ -75,7 +75,7 @@ resource "aws_secretsmanager_secret" "db_credentials" {
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials_ver" {
-  secret_id     = aws_secretsmanager_secret.db_credentials.id
+  secret_id = aws_secretsmanager_secret.db_credentials.id
   secret_string = jsonencode({
     username = var.db_username,
     password = random_password.db_master.result
