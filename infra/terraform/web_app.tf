@@ -35,6 +35,10 @@ resource "aws_ecs_task_definition" "web_app" {
           name  = "VITE_API_AUTH"
           value = "https://${aws_lb.alb.dns_name}/auth"
         }
+        ,{
+          name  = "VITE_GOOGLE_CLIENT_ID"
+          value = var.google_client_id
+        }
       ]
       logConfiguration = {
         logDriver = "awslogs"
