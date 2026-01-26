@@ -120,10 +120,14 @@ resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.alb.arn
   port              = "80"
   protocol          = "HTTP"
-
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.need_server_tg.arn
+    type = "redirect"
+
+    redirect {
+      protocol    = "HTTPS"
+      port        = "443"
+      status_code = "HTTP_301"
+    }
   }
 }
 
@@ -191,50 +195,8 @@ resource "aws_lb_listener_rule" "web_path_https" {
   }
 }
 
-resource "aws_lb_listener_rule" "resource_path" {
-  listener_arn = aws_lb_listener.http.arn
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.resource_server_tg.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/resources*"]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "auth_path" {
-  listener_arn = aws_lb_listener.http.arn
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.auth_server_tg.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/auth*"]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "web_path" {
-  listener_arn = aws_lb_listener.http.arn
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.web_app_tg.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/", "/*"]
-    }
-  }
-}
+/* HTTP listener now redirects all requests to HTTPS. Listener rules for forwarding
+   are defined on the HTTPS listener (see resource_*_https, auth_path_https, web_path_https). */
 
 // Allow ALB to reach service container ports
 resource "aws_security_group_rule" "alb_to_service_need" {

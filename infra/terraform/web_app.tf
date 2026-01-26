@@ -68,7 +68,7 @@ resource "aws_ecs_service" "web_app" {
     container_port   = 80
   }
 
-  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.web_app_tg, aws_lb.alb, aws_lb_listener.http, aws_cloudwatch_log_group.web_app]
+  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.web_app_tg, aws_lb.alb, aws_lb_listener.https, aws_cloudwatch_log_group.web_app]
 }
 
 resource "aws_cloudwatch_log_group" "web_app" {

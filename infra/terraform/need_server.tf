@@ -80,7 +80,7 @@ resource "aws_ecs_service" "need_server" {
     container_port   = 4020
   }
 
-  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.need_server_tg, aws_lb.alb, aws_lb_listener.http, aws_cloudwatch_log_group.need_server]
+  depends_on = [aws_ecs_cluster.knapsack, aws_lb_target_group.need_server_tg, aws_lb.alb, aws_lb_listener.https, aws_cloudwatch_log_group.need_server]
 }
 
 // Create a log group for the service

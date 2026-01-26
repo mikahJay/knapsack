@@ -11,6 +11,7 @@ build/
 # Terraform plan and state artifacts
 **/plan.tfplan
 **/*.tfplan
+.terraform.lock.hcl
 # Terraform local backend files
 *.tfstate
 *.tfstate.backup
@@ -20,3 +21,12 @@ apps/web-app/coverage/
 # Generated sample data
 scripts/sample_resources.json
 scripts/sample_needs.json
+
+
+# misc
+admin-contact.json
+
+registrant-contact.json
+tech-contact.json
+user-contact.json
+
