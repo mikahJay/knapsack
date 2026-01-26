@@ -30,7 +30,8 @@ export async function fetchGoogleProfile(accessToken){
 }
 
 export function buildGoogleAuthUrl(){
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  const RUNTIME_ENV = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {}
+  const clientId = RUNTIME_ENV.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
   const redirect = `${location.origin}/auth-callback.html`
   const scope = 'openid profile email'
   // generate secure random state and nonce
