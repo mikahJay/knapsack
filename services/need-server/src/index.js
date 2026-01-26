@@ -26,6 +26,24 @@ app.use((req, res, next) => {
   next()
 })
 
+// Enforce requests come from the web-app origin and require authenticated users.
+// Allow OPTIONS through for CORS preflight.
+const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN || `https://${process.env.DOMAIN_NAME || 'knap-sack.com'}`
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next()
+  const origin = req.headers.origin
+  if (!origin || origin !== WEB_APP_ORIGIN) return res.status(403).json({ error: 'forbidden origin' })
+  next()
+})
+
+// Require a valid Google ID token for all routes (except preflight). This ensures the
+// request originates from an authenticated web-app user.
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next()
+  return authRequired(req, res, next)
+})
+
 app.get('/', (req, res) => res.sendStatus(200))
 
 // Support ALB path /need so requests routed to /need return 200 as well

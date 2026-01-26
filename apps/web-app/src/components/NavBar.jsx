@@ -124,12 +124,16 @@ export default function NavBar(){
                 <Link className="nav-link" to="/my-needs">My Needs</Link>
               </li>
             )}
-            <li className="nav-item">
-              <Link className="nav-link" to="/find-resources">Find Resources</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/find-needs">Find Needs</Link>
-            </li>
+            {user && (
+              <li className="nav-item">
+                <Link className="nav-link" to="/find-resources">Find Resources</Link>
+              </li>
+            )}
+            {user && (
+              <li className="nav-item">
+                <Link className="nav-link" to="/find-needs">Find Needs</Link>
+              </li>
+            )}
           </ul>
 
           <div className="d-flex align-items-center">

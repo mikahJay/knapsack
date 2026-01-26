@@ -28,6 +28,21 @@ app.use((req, res, next) => {
   next()
 })
 
+// Enforce web-app origin and require authenticated users for all non-OPTIONS requests
+const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN || `https://${process.env.DOMAIN_NAME || 'knap-sack.com'}`
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next()
+  const origin = req.headers.origin
+  if (!origin || origin !== WEB_APP_ORIGIN) return res.status(403).json({ error: 'forbidden origin' })
+  next()
+})
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') return next()
+  return authRequired(req, res, next)
+})
+
 const { pool, initDb } = require('./db')
 
 app.get('/', (req, res) => res.sendStatus(200))
