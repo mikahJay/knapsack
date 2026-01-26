@@ -120,10 +120,6 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
-          build-args: |
-            VITE_API_NEED=http://${{ needs.prepare.outputs.alb_dns }}/need
-            VITE_API_RESOURCE=http://${{ needs.prepare.outputs.alb_dns }}/resources
-            VITE_API_AUTH=http://${{ needs.prepare.outputs.alb_dns }}/auth
           tags: |
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:${{ github.sha }}
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest

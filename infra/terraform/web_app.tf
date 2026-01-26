@@ -25,17 +25,19 @@ resource "aws_ecs_task_definition" "web_app" {
         },
         {
           name  = "VITE_API_NEED"
-          # expose the API base; components append /needs
-          value = "https://${aws_lb.alb.dns_name}"
+          # use the public domain name (matches ACM certificate) so browser TLS succeeds;
+          # components append /needs when calling the API
+          value = "https://${var.domain_name}"
         },
         {
           name  = "VITE_API_RESOURCE"
-          # expose the API base; components append /resources
-          value = "https://${aws_lb.alb.dns_name}"
+          # use the public domain name (matches ACM certificate)
+          value = "https://${var.domain_name}"
         },
         {
           name  = "VITE_API_AUTH"
-          value = "https://${aws_lb.alb.dns_name}/auth"
+          # auth endpoints live under the same public domain
+          value = "https://${var.domain_name}/auth"
         }
         ,{
           name  = "VITE_GOOGLE_CLIENT_ID"
