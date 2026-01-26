@@ -47,3 +47,28 @@ output "acm_certificate_arn" {
 output "route53_zone_id" {
   value = aws_route53_zone.primary.zone_id
 }
+
+# Create Route53 alias records pointing the public domain and www to the ALB
+resource "aws_route53_record" "apex_alias" {
+  zone_id = aws_route53_zone.primary.zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.alb.dns_name
+    zone_id                = aws_lb.alb.zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_route53_record" "www_alias" {
+  zone_id = aws_route53_zone.primary.zone_id
+  name    = "www.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.alb.dns_name
+    zone_id                = aws_lb.alb.zone_id
+    evaluate_target_health = true
+  }
+}
