@@ -150,15 +150,37 @@ resource "aws_lb_listener" "https" {
 resource "aws_lb_listener_rule" "resource_path_https" {
   count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
   listener_arn = aws_lb_listener.https[0].arn
+  # Ensure this rule has higher priority than the catch-all web rule
+  priority     = 100
 
   action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.resource_server_tg.arn
   }
 
+    condition {
+      path_pattern {
+        # match /resources and /resources/*
+        values = ["/resources", "/resources/*"]
+      }
+    }
+}
+
+resource "aws_lb_listener_rule" "need_path_https" {
+  count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  # Ensure this rule has higher priority than other rules so /need routes correctly
+  priority     = 50
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.need_server_tg.arn
+  }
+
   condition {
     path_pattern {
-      values = ["/resources*"]
+      # match /need and /need/*
+      values = ["/need", "/need/*"]
     }
   }
 }
@@ -166,6 +188,7 @@ resource "aws_lb_listener_rule" "resource_path_https" {
 resource "aws_lb_listener_rule" "auth_path_https" {
   count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
   listener_arn = aws_lb_listener.https[0].arn
+  priority     = 200
 
   action {
     type             = "forward"
@@ -184,6 +207,9 @@ resource "aws_lb_listener_rule" "auth_path_https" {
 resource "aws_lb_listener_rule" "web_path_https" {
   count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
   listener_arn = aws_lb_listener.https[0].arn
+
+  # low priority catch-all for the SPA
+  priority = 1000
 
   action {
     type             = "forward"

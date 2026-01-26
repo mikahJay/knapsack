@@ -194,3 +194,25 @@ jobs:
               echo "No task definition found for family $FAMILY"
             fi
           fi
+
+          # Post-deploy runtime config check (web-app only)
+          if [ "${{ matrix.name }}" = "web-app" ]; then
+            ALB_DOMAIN="${{ needs.prepare.outputs.alb_dns }}"
+            if [ -z "$ALB_DOMAIN" ]; then
+              echo "ALB domain unknown; skipping runtime env-config.js check"
+            else
+              URL="https://${ALB_DOMAIN}/env-config.js"
+              echo "Checking runtime config at $URL"
+              if ! curl -sfS "$URL" -o /tmp/env-config.js; then
+                echo "Failed to fetch env-config.js at $URL"
+                exit 1
+              fi
+              # Fail if VITE_GOOGLE_CLIENT_ID is empty
+              if grep -qE 'VITE_GOOGLE_CLIENT_ID: \"\"' /tmp/env-config.js; then
+                echo "VITE_GOOGLE_CLIENT_ID is empty in env-config.js"
+                cat /tmp/env-config.js
+                exit 1
+              fi
+              echo "Runtime env-config.js contains VITE_GOOGLE_CLIENT_ID"
+            fi
+          fi

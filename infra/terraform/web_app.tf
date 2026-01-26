@@ -25,11 +25,13 @@ resource "aws_ecs_task_definition" "web_app" {
         },
         {
           name  = "VITE_API_NEED"
-          value = "https://${aws_lb.alb.dns_name}/need"
+          # expose the API base; components append /needs
+          value = "https://${aws_lb.alb.dns_name}"
         },
         {
           name  = "VITE_API_RESOURCE"
-          value = "https://${aws_lb.alb.dns_name}/resources"
+          # expose the API base; components append /resources
+          value = "https://${aws_lb.alb.dns_name}"
         },
         {
           name  = "VITE_API_AUTH"
