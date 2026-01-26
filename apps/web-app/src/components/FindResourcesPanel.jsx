@@ -3,7 +3,8 @@ import { getUser } from '../utils/auth'
 
 export default function FindResourcesPanel(){
   const [query, setQuery] = useState('')
-  const API_BASE = import.meta.env.VITE_API_RESOURCE || import.meta.env.VITE_API_BASE || ''
+  const RUNTIME_ENV = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {}
+  const API_BASE = RUNTIME_ENV.VITE_API_RESOURCE || import.meta.env.VITE_API_RESOURCE || import.meta.env.VITE_API_BASE || ''
   const [items, setItems] = useState([])
   const [status, setStatus] = useState(null)
   const [lastUrl, setLastUrl] = useState('')

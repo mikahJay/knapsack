@@ -21,7 +21,8 @@ export default function MyNeedsPanel(){
   const [isPublic, setIsPublic] = useState(false)
   const [status, setStatus] = useState(null)
 
-  const API_BASE = import.meta.env.VITE_API_NEED || import.meta.env.VITE_API_BASE || ''
+  const RUNTIME_ENV = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {}
+  const API_BASE = RUNTIME_ENV.VITE_API_NEED || import.meta.env.VITE_API_NEED || import.meta.env.VITE_API_BASE || ''
   const [items, setItems] = useState([])
 
   async function fetchMyNeeds(){

@@ -22,7 +22,8 @@ export default function MyResourcesPanel(){
   const [status, setStatus] = useState(null)
 
   // prefer the resource-specific env var set by the local start script
-  const API_BASE = import.meta.env.VITE_API_RESOURCE || import.meta.env.VITE_API_BASE || ''
+  const RUNTIME_ENV = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {}
+  const API_BASE = RUNTIME_ENV.VITE_API_RESOURCE || import.meta.env.VITE_API_RESOURCE || import.meta.env.VITE_API_BASE || ''
   const [items, setItems] = useState([])
 
   async function fetchMyResources(){
