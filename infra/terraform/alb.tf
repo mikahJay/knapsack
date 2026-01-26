@@ -174,7 +174,9 @@ resource "aws_lb_listener_rule" "auth_path_https" {
 
   condition {
     path_pattern {
-      values = ["/auth*"]
+      # Only forward exact /auth and subpaths like /auth/* to the auth server.
+      # Prevents paths like /auth-callback.html from being routed to the auth service.
+      values = ["/auth", "/auth/*"]
     }
   }
 }
