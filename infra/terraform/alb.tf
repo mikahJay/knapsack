@@ -56,7 +56,7 @@ resource "aws_lb_target_group" "need_server_tg" {
   target_type = "ip"
 
   health_check {
-    path                = "/"
+    path                = "/health"
     matcher             = "200-399"
     interval            = 30
     timeout             = 5
@@ -73,7 +73,7 @@ resource "aws_lb_target_group" "resource_server_tg" {
   target_type = "ip"
 
   health_check {
-    path                = "/"
+    path                = "/health"
     matcher             = "200-399"
     interval            = 30
     timeout             = 5
@@ -90,7 +90,7 @@ resource "aws_lb_target_group" "auth_server_tg" {
   target_type = "ip"
 
   health_check {
-    path                = "/"
+    path                = "/health"
     matcher             = "200-399"
     interval            = 30
     timeout             = 5
@@ -142,7 +142,8 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.need_server_tg.arn
+    # Default to the web app so requests to the root domain go to the SPA
+    target_group_arn = aws_lb_target_group.web_app_tg.arn
   }
 }
 
@@ -177,13 +178,12 @@ resource "aws_lb_listener_rule" "need_path_https" {
     target_group_arn = aws_lb_target_group.need_server_tg.arn
   }
 
-  condition {
-    path_pattern {
-      # match /need and /need/*
-      # also match /needs to support plural route used by the SPA
-      values = ["/need", "/need/*", "/needs", "/needs/*"]
+    condition {
+      path_pattern {
+        # match the plural /needs route and subpaths used by the SPA
+        values = ["/needs", "/needs/*"]
+      }
     }
-  }
 }
 
 resource "aws_lb_listener_rule" "auth_path_https" {

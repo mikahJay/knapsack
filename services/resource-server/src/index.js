@@ -45,11 +45,9 @@ app.use((req, res, next) => {
 
 const { pool, initDb } = require('./db')
 
-app.get('/', (req, res) => res.sendStatus(200))
-
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'resource-server' }))
 
-app.get('/resource', (req, res) => res.sendStatus(200))
+// root (/) and /resources endpoints are used; remove singular /resource shortcut for consistency
 
 // List / search resources
 app.get('/resources', async (req, res) => {

@@ -44,11 +44,6 @@ app.use((req, res, next) => {
   return authRequired(req, res, next)
 })
 
-app.get('/', (req, res) => res.sendStatus(200))
-
-// Support ALB path /need so requests routed to /need return 200 as well
-app.get('/need', (req, res) => res.sendStatus(200))
-
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'need-server' }))
 
 // List / search needs

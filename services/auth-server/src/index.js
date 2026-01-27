@@ -13,10 +13,6 @@ app.use((req, res, next) => {
 
 app.get('/health', (req, res) => res.json({status: 'ok', service: 'auth-server'}))
 
-app.get('/', (req, res) => {
-  res.json({message: 'auth-server scaffold — SSO endpoints to be implemented'})
-})
-
 // Support ALB path /auth so requests routed to /auth return 200 as well
 app.get('/auth', (req, res) => res.sendStatus(200))
 
