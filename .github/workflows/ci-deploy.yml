@@ -14,6 +14,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
+      # (Removed change-detection steps; deploy will run unconditionally)
+      
+
+      
+
+      
+ 
+
+      
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -104,6 +114,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -112,10 +123,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Clean stuck ECS tasks (pending)
+        run: |
+          set -euo pipefail
+          CLUSTER=knapsack-test
+          echo "Looking for PENDING tasks in cluster $CLUSTER"
+          TASK_ARNS=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status PENDING --region ${{ secrets.AWS_REGION }} --output text || true)
+          if [ -z "$TASK_ARNS" ] || [ "$TASK_ARNS" = "None" ]; then
+            echo "No PENDING tasks found"
+          else
+            for TASK in $TASK_ARNS; do
+              LAST=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK" --region ${{ secrets.AWS_REGION }} --query 'tasks[0].lastStatus' --output text || echo "UNKNOWN")
+              echo "Task $TASK lastStatus=$LAST"
+              if [ "$LAST" != "RUNNING" ]; then
+                echo "Stopping task $TASK (status $LAST)"
+                aws ecs stop-task --cluster "$CLUSTER" --task "$TASK" --reason "CI cleanup: stopping non-running task" --region ${{ secrets.AWS_REGION }} || true
+              fi
+            done
+          fi
+
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and push image
+        
         uses: docker/build-push-action@v4
         with:
           context: ${{ matrix.context }}
@@ -125,11 +156,13 @@ jobs:
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest
 
       - name: Export deploy variables
+        
         run: |
           echo "TF_VAR_image_tag=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "TF_VAR_google_client_id=${{ secrets.GOOGLE_CLIENT_ID }}" >> $GITHUB_ENV
 
       - name: Setup Terraform
+        
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: latest
@@ -138,12 +171,14 @@ jobs:
         run: terraform -chdir=infra/terraform init -input=false -reconfigure
 
       - name: Import existing ECR repo into state (if present)
+        
         run: |
           if aws ecr describe-repositories --repository-names "${{ matrix.repo }}" >/dev/null 2>&1; then
             terraform -chdir=infra/terraform state list aws_ecr_repository.${{ matrix.tf_name }} >/dev/null 2>&1 || terraform -chdir=infra/terraform import aws_ecr_repository.${{ matrix.tf_name }} ${{ matrix.repo }} || echo "terraform import ${matrix.repo} failed"
           fi
 
       - name: Ensure ECS cluster + service exist and redeploy
+        
         run: |
           set -euo pipefail
 
@@ -160,7 +195,33 @@ jobs:
             # sanitize: some AWS CLI outputs include a header/label when using --output text
             TD_ARN=$(printf "%s" "$TD_ARN" | awk '{print $NF}')
             if [ -n "$TD_ARN" ]; then
-              aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }} || echo "update-service failed after terraform"
+              # Ensure the newly registered task definition is available, then update the service
+              ATTEMPTS=0
+              MAX_ATTEMPTS=6
+              UPDATED=0
+              until [ $ATTEMPTS -ge $MAX_ATTEMPTS ]
+              do
+                ATTEMPTS=$((ATTEMPTS+1))
+                echo "Checking availability of task definition (attempt $ATTEMPTS/$MAX_ATTEMPTS): $TD_ARN"
+                if aws ecs describe-task-definition --task-definition "$TD_ARN" --region ${{ secrets.AWS_REGION }} >/dev/null 2>&1; then
+                  echo "Task definition available; attempting update-service"
+                  if aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }}; then
+                    UPDATED=1
+                    break
+                  else
+                    echo "aws ecs update-service failed; retrying after backoff"
+                  fi
+                else
+                  echo "Task definition not yet visible to ECS API; retrying after backoff"
+                fi
+                sleep $((ATTEMPTS * 2))
+              done
+              if [ "$UPDATED" -ne 1 ]; then
+                echo "update-service failed after ${MAX_ATTEMPTS} attempts"
+                echo "TD_ARN=[$TD_ARN]"
+                aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 5 --region ${{ secrets.AWS_REGION }} --output text || true
+                exit 1
+              fi
             else
               echo "No task definition found for family $FAMILY"
             fi
@@ -196,7 +257,32 @@ jobs:
             TD_ARN=$(printf "%s" "$TD_ARN" | awk '{print $NF}')
             if [ -n "$TD_ARN" ]; then
               echo "Updating service to use $TD_ARN"
-              aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }} || echo "update-service failed"
+              # Retry describe + update to guard against eventual consistency
+              ATTEMPTS=0
+              MAX_ATTEMPTS=6
+              UPDATED=0
+              until [ $ATTEMPTS -ge $MAX_ATTEMPTS ]
+              do
+                ATTEMPTS=$((ATTEMPTS+1))
+                echo "Checking task definition visibility (attempt $ATTEMPTS/$MAX_ATTEMPTS): $TD_ARN"
+                if aws ecs describe-task-definition --task-definition "$TD_ARN" --region ${{ secrets.AWS_REGION }} >/dev/null 2>&1; then
+                  if aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }}; then
+                    UPDATED=1
+                    break
+                  else
+                    echo "aws ecs update-service failed; will retry"
+                  fi
+                else
+                  echo "Task definition not yet visible; will retry"
+                fi
+                sleep $((ATTEMPTS * 2))
+              done
+              if [ "$UPDATED" -ne 1 ]; then
+                echo "update-service failed after ${MAX_ATTEMPTS} attempts"
+                echo "TD_ARN=[$TD_ARN]"
+                aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 5 --region ${{ secrets.AWS_REGION }} --output text || true
+                exit 1
+              fi
 
               echo "Waiting for service to become stable..."
               if ! aws ecs wait services-stable --cluster knapsack-test --services ${{ matrix.name }}-test --region ${{ secrets.AWS_REGION }} --no-paginate; then
