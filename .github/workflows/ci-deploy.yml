@@ -156,7 +156,9 @@ jobs:
 
             # Find latest task definition ARN for the family and update service
             FAMILY="${{ matrix.name }}-test"
-            TD_ARN=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 1 --region ${{ secrets.AWS_REGION }} --output text || true)
+            TD_ARN=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 1 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns[0]' --output text || true)
+            # sanitize: some AWS CLI outputs include a header/label when using --output text
+            TD_ARN=$(printf "%s" "$TD_ARN" | awk '{print $NF}')
             if [ -n "$TD_ARN" ]; then
               aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }} || echo "update-service failed after terraform"
             else
@@ -189,7 +191,9 @@ jobs:
 
             # Determine newest task definition ARN for the family and update the service explicitly
             FAMILY="${{ matrix.name }}-test"
-            TD_ARN=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 1 --region ${{ secrets.AWS_REGION }} --output text || true)
+            TD_ARN=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 1 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns[0]' --output text || true)
+            # sanitize any header text; take last field which should be the ARN
+            TD_ARN=$(printf "%s" "$TD_ARN" | awk '{print $NF}')
             if [ -n "$TD_ARN" ]; then
               echo "Updating service to use $TD_ARN"
               aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }} || echo "update-service failed"
