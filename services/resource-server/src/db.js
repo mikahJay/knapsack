@@ -20,7 +20,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 })
 
+// Diagnostic: print database connection info (don't print secrets)
 console.log('DB_SSL env:', process.env.DB_SSL)
+console.log('DB connection info:', {
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || '5432',
+  database: process.env.DB_NAME || 'knapsack',
+  has_db_credentials: !!(process.env.DB_CREDENTIALS || process.env.DB_USER || process.env.DB_PASSWORD),
+})
 
 async function runMigrations() {
   const client = await pool.connect()
