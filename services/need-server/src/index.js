@@ -32,6 +32,8 @@ const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN || `https://${process.env.DOMA
 
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
+  // Permit ALB health checks (no Origin header) to reach /health
+  if (req.path === '/health') return next()
   const origin = req.headers.origin
   if (!origin || origin !== WEB_APP_ORIGIN) return res.status(403).json({ error: 'forbidden origin' })
   next()
