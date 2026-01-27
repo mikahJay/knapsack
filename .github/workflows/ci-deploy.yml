@@ -191,10 +191,18 @@ jobs:
 
             # Find latest task definition ARN for the family and update service
             FAMILY="${{ matrix.name }}-test"
-            TD_ARN=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 1 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns[0]' --output text || true)
-            # sanitize: some AWS CLI outputs include a header/label when using --output text
-            TD_ARN=$(printf "%s" "$TD_ARN" | awk '{print $NF}')
+            # Request the list and robustly extract the first arn:aws:ecs: token (guard against header/None/newlines)
+            TD_ARN_RAW=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 5 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns' --output text || true)
+            TD_ARN=$(printf "%s" "$TD_ARN_RAW" | tr -d '\r' | tr ' ' '\n' | grep -m1 -E '^arn:aws:ecs:' || true)
             if [ -n "$TD_ARN" ]; then
+              # Verify the selected task definition is ACTIVE
+              TD_STATUS=$(aws ecs describe-task-definition --task-definition "$TD_ARN" --region ${{ secrets.AWS_REGION }} --query 'taskDefinition.status' --output text 2>/dev/null || true)
+              if [ "$TD_STATUS" != "ACTIVE" ]; then
+                echo "Selected task definition is not ACTIVE: status=$TD_STATUS"
+                echo "Available ACTIVE task definitions for $FAMILY:"
+                aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 10 --region ${{ secrets.AWS_REGION }} --output text || true
+                exit 1
+              fi
               # Ensure the newly registered task definition is available, then update the service
               ATTEMPTS=0
               MAX_ATTEMPTS=6
@@ -252,10 +260,18 @@ jobs:
 
             # Determine newest task definition ARN for the family and update the service explicitly
             FAMILY="${{ matrix.name }}-test"
-            TD_ARN=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 1 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns[0]' --output text || true)
-            # sanitize any header text; take last field which should be the ARN
-            TD_ARN=$(printf "%s" "$TD_ARN" | awk '{print $NF}')
+            # Request the list and robustly extract the first arn:aws:ecs: token (guard against header/None/newlines)
+            TD_ARN_RAW=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 5 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns' --output text || true)
+            TD_ARN=$(printf "%s" "$TD_ARN_RAW" | tr -d '\r' | tr ' ' '\n' | grep -m1 -E '^arn:aws:ecs:' || true)
             if [ -n "$TD_ARN" ]; then
+              # Verify the selected task definition is ACTIVE
+              TD_STATUS=$(aws ecs describe-task-definition --task-definition "$TD_ARN" --region ${{ secrets.AWS_REGION }} --query 'taskDefinition.status' --output text 2>/dev/null || true)
+              if [ "$TD_STATUS" != "ACTIVE" ]; then
+                echo "Selected task definition is not ACTIVE: status=$TD_STATUS"
+                echo "Available ACTIVE task definitions for $FAMILY:"
+                aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 10 --region ${{ secrets.AWS_REGION }} --output text || true
+                exit 1
+              fi
               echo "Updating service to use $TD_ARN"
               # Retry describe + update to guard against eventual consistency
               ATTEMPTS=0
