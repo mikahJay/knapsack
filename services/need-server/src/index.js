@@ -43,6 +43,8 @@ app.use((req, res, next) => {
 // request originates from an authenticated web-app user.
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
+  // Allow health checks to bypass authentication
+  if (req.path === '/health') return next()
   return authRequired(req, res, next)
 })
 
