@@ -45,7 +45,7 @@ jobs:
             fi
           done
 
-      - name: Terraform init & network apply
+      - name: Terraform init & network + DB apply
         run: |
           terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
           terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" \
@@ -71,7 +71,12 @@ jobs:
             -target=aws_lb_listener_rule.auth_path \
             -target=aws_lb_listener_rule.web_path \
             -target=aws_vpc_endpoint.secretsmanager \
-            -auto-approve || echo "network apply exited non-zero"
+            -target=aws_db_subnet_group.knapsack \
+            -target=aws_security_group.rds_sg \
+            -target=aws_db_instance.knapsack \
+            -target=aws_secretsmanager_secret.db_credentials \
+            -target=aws_secretsmanager_secret_version.db_credentials_ver \
+            -auto-approve || echo "network/DB apply exited non-zero"
 
       - name: Export ALB DNS for builds
         id: export_alb
