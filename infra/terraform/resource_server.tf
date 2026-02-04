@@ -45,8 +45,10 @@ resource "aws_ecs_task_definition" "resource_server" {
         },
         {
           name  = "GOOGLE_CLIENT_ID"
-          value = var.google_client_id
-        }
+          value = var.google_client_id        },
+        {
+          name  = "DOMAIN_NAME"
+          value = var.domain_name        }
       ]
       logConfiguration = {
         logDriver = "awslogs"
