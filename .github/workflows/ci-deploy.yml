@@ -188,10 +188,22 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Check if service exists and is in a bad state (INACTIVE, DRAINING)
+          SERVICE_STATUS=$(aws ecs describe-services --cluster knapsack-test --services ${{ matrix.name }}-test --region ${{ secrets.AWS_REGION }} --query 'services[0].status' --output text 2>/dev/null || echo "NOTFOUND")
+          
+          if [ "$SERVICE_STATUS" != "ACTIVE" ] && [ "$SERVICE_STATUS" != "NOTFOUND" ]; then
+            echo "Service is in $SERVICE_STATUS state; force deleting and will recreate..."
+            aws ecs delete-service --cluster knapsack-test --service ${{ matrix.name }}-test --region ${{ secrets.AWS_REGION }} --force || true
+            # Wait for deletion to complete
+            echo "Waiting for service deletion to complete..."
+            sleep 30
+            SERVICE_STATUS="NOTFOUND"
+          fi
+
           # Try to trigger a redeploy first (service may already exist)
           OUT=$(aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --force-new-deployment 2>&1) || true
 
-          if echo "$OUT" | grep -q "ServiceNotFoundException"; then
+          if echo "$OUT" | grep -q "ServiceNotFoundException" || [ "$SERVICE_STATUS" = "NOTFOUND" ]; then
             echo "${{ matrix.name }} service not found; running Terraform to create cluster, task def and service..."
             # Ensure CloudWatch log group exists first
             terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_cloudwatch_log_group.${{ matrix.tf_name }} -auto-approve || echo "Log group may already exist"
