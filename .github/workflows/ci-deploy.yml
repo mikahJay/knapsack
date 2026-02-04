@@ -98,6 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 1  # Serialize to avoid Terraform lock conflicts
       matrix:
         include:
           - name: need-server
@@ -192,6 +193,9 @@ jobs:
 
           if echo "$OUT" | grep -q "ServiceNotFoundException"; then
             echo "${{ matrix.name }} service not found; running Terraform to create cluster, task def and service..."
+            # Ensure CloudWatch log group exists first
+            terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_cloudwatch_log_group.${{ matrix.tf_name }} -auto-approve || echo "Log group may already exist"
+            # Create cluster, task definition, and service
             terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.${{ matrix.tf_name }} -target=aws_ecs_service.${{ matrix.tf_name }} -auto-approve || { echo "terraform apply exited non-zero"; exit 1; }
 
             # Find latest task definition ARN for the family and update service
