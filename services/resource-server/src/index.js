@@ -36,6 +36,7 @@ app.use((req, res, next) => {
   // Allow health checks from the ALB (no Origin header)
   if (req.path === '/health') return next()
   const origin = req.headers.origin
+  console.log(`Origin check: received="${origin}" expected="${WEB_APP_ORIGIN}" path="${req.path}"`)
   if (!origin || origin !== WEB_APP_ORIGIN) return res.status(403).json({ error: 'forbidden origin' })
   next()
 })
