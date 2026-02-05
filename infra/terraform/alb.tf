@@ -14,14 +14,14 @@ resource "aws_security_group" "alb_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = concat([aws_vpc.knapsack.cidr_block], var.allowed_alb_cidr_blocks)
+    cidr_blocks = concat(["0.0.0.0/0"], var.allowed_alb_cidr_blocks)
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = concat([aws_vpc.knapsack.cidr_block], var.allowed_alb_cidr_blocks)
+    cidr_blocks = concat(["0.0.0.0/0"], var.allowed_alb_cidr_blocks)
   }
 
   egress {
