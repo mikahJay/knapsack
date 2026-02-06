@@ -29,15 +29,19 @@ app.use((req, res, next) => {
 })
 
 // Enforce web-app origin and require authenticated users for all non-OPTIONS requests
-const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN || `https://${process.env.DOMAIN_NAME || 'knap-sack.com'}`
+const domainName = process.env.DOMAIN_NAME || 'knap-sack.com'
+const defaultOrigins = [`https://${domainName}`, `https://www.${domainName}`]
+const envOrigins = (process.env.WEB_APP_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+const webAppOrigin = process.env.WEB_APP_ORIGIN ? [process.env.WEB_APP_ORIGIN] : []
+const allowedOrigins = [...new Set([...webAppOrigin, ...envOrigins, ...defaultOrigins])]
 
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Allow health checks from the ALB (no Origin header)
   if (req.path === '/health') return next()
   const origin = req.headers.origin
-  console.log(`Origin check: received="${origin}" expected="${WEB_APP_ORIGIN}" path="${req.path}"`)
-  if (!origin || origin !== WEB_APP_ORIGIN) return res.status(403).json({ error: 'forbidden origin' })
+  console.log(`Origin check: received="${origin}" allowed="${allowedOrigins.join(',')}" path="${req.path}"`)
+  if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: 'forbidden origin' })
   next()
 })
 
