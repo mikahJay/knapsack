@@ -108,6 +108,8 @@ jobs:
     name: Build & Deploy services
     needs: prepare
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_TARGET: ${{ github.event.inputs.deploy_target || 'all' }}
     strategy:
       fail-fast: false
       max-parallel: 1  # Serialize to avoid Terraform lock conflicts
@@ -164,7 +166,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and push image
-        if: ${{ inputs.deploy_target == 'all' || inputs.deploy_target == '' || inputs.deploy_target == matrix.name }}
+        if: ${{ env.DEPLOY_TARGET == 'all' || env.DEPLOY_TARGET == matrix.name }}
         
         uses: docker/build-push-action@v4
         with:
@@ -175,25 +177,25 @@ jobs:
             ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest
 
       - name: Export deploy variables
-        if: ${{ inputs.deploy_target == 'all' || inputs.deploy_target == '' || inputs.deploy_target == matrix.name }}
+        if: ${{ env.DEPLOY_TARGET == 'all' || env.DEPLOY_TARGET == matrix.name }}
         
         run: |
           echo "TF_VAR_image_tag=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "TF_VAR_google_client_id=${{ secrets.GOOGLE_CLIENT_ID }}" >> $GITHUB_ENV
 
       - name: Setup Terraform
-        if: ${{ inputs.deploy_target == 'all' || inputs.deploy_target == '' || inputs.deploy_target == matrix.name }}
+        if: ${{ env.DEPLOY_TARGET == 'all' || env.DEPLOY_TARGET == matrix.name }}
         
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: latest
 
       - name: Terraform init
-        if: ${{ inputs.deploy_target == 'all' || inputs.deploy_target == '' || inputs.deploy_target == matrix.name }}
+        if: ${{ env.DEPLOY_TARGET == 'all' || env.DEPLOY_TARGET == matrix.name }}
         run: terraform -chdir=infra/terraform init -input=false -reconfigure
 
       - name: Import existing ECR repo into state (if present)
-        if: ${{ inputs.deploy_target == 'all' || inputs.deploy_target == '' || inputs.deploy_target == matrix.name }}
+        if: ${{ env.DEPLOY_TARGET == 'all' || env.DEPLOY_TARGET == matrix.name }}
         
         run: |
           if aws ecr describe-repositories --repository-names "${{ matrix.repo }}" >/dev/null 2>&1; then
@@ -201,7 +203,7 @@ jobs:
           fi
 
       - name: Ensure ECS cluster + service exist and redeploy
-        if: ${{ inputs.deploy_target == 'all' || inputs.deploy_target == '' || inputs.deploy_target == matrix.name }}
+        if: ${{ env.DEPLOY_TARGET == 'all' || env.DEPLOY_TARGET == matrix.name }}
         
         run: |
           set -euo pipefail
