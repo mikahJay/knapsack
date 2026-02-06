@@ -28,8 +28,16 @@ async function authOptional(req, res, next){
 
 async function authRequired(req, res, next){
   const auth = req.headers.authorization || ''
+  if(!auth){
+    console.warn('auth header missing', { path: req.path, origin: req.headers.origin || '' })
+    return res.status(401).json({ error: 'missing or invalid authorization header' })
+  }
   const m = auth.match(/^Bearer (.+)$/)
-  if(!m) return res.status(401).json({ error: 'missing or invalid authorization header' })
+  if(!m){
+    const prefix = auth.split(' ')[0]
+    console.warn('auth header malformed', { path: req.path, origin: req.headers.origin || '', prefix, length: auth.length })
+    return res.status(401).json({ error: 'missing or invalid authorization header' })
+  }
   const token = m[1]
   try{
     const payload = await verifyIdToken(token)
