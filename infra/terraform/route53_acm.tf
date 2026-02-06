@@ -53,6 +53,7 @@ resource "aws_route53_record" "apex_alias" {
   zone_id = aws_route53_zone.primary.zone_id
   name    = var.domain_name
   type    = "A"
+  allow_overwrite = true
 
   alias {
     name                   = aws_lb.alb.dns_name
@@ -65,6 +66,7 @@ resource "aws_route53_record" "www_alias" {
   zone_id = aws_route53_zone.primary.zone_id
   name    = "www.${var.domain_name}"
   type    = "A"
+  allow_overwrite = true
 
   alias {
     name                   = aws_lb.alb.dns_name

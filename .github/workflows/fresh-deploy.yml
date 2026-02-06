@@ -1,0 +1,134 @@
+name: Fresh Deploy (Destroy + Recreate)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'yes' to destroy and redeploy the test environment"
+        required: true
+        default: "no"
+        type: choice
+        options:
+          - no
+          - yes
+
+jobs:
+  destroy:
+    name: Destroy test environment
+    if: ${{ inputs.confirm == 'yes' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: Terraform init
+        run: terraform -chdir=infra/terraform init -input=false -reconfigure
+
+      - name: Destroy Terraform-managed resources
+        run: terraform -chdir=infra/terraform destroy -var="environment=test" -auto-approve
+
+      - name: Delete ECR repositories
+        run: |
+          set -euo pipefail
+          for repo in need-server-test resource-server-test auth-server-test web-app-test; do
+            aws ecr delete-repository --repository-name "$repo" --force || true
+          done
+
+  deploy:
+    name: Recreate and deploy services
+    needs: destroy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - name: need-server
+            repo: need-server-test
+            context: services/need-server
+            tf_name: need_server
+          - name: resource-server
+            repo: resource-server-test
+            context: services/resource-server
+            tf_name: resource_server
+          - name: auth-server
+            repo: auth-server-test
+            context: services/auth-server
+            tf_name: auth_server
+          - name: web-app
+            repo: web-app-test
+            context: apps/web-app
+            tf_name: web_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: Terraform init
+        run: terraform -chdir=infra/terraform init -input=false -reconfigure
+
+      - name: Recreate infrastructure
+        run: terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -auto-approve
+
+      - name: Ensure ECR repositories exist
+        run: |
+          set -euo pipefail
+          for repo in need-server-test resource-server-test auth-server-test web-app-test; do
+            if ! aws ecr describe-repositories --repository-names "$repo" >/dev/null 2>&1; then
+              aws ecr create-repository --repository-name "$repo"
+            fi
+          done
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push image
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:${{ github.sha }}
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ matrix.repo }}:latest
+
+      - name: Export deploy variables
+        run: |
+          echo "TF_VAR_image_tag=${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "TF_VAR_google_client_id=${{ secrets.GOOGLE_CLIENT_ID }}" >> $GITHUB_ENV
+
+      - name: Register task definition and ensure service
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_cloudwatch_log_group.${{ matrix.tf_name }} -auto-approve || true
+          terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_ecs_task_definition.${{ matrix.tf_name }} -target=aws_ecs_service.${{ matrix.tf_name }} -auto-approve
+
+          FAMILY="${{ matrix.name }}-test"
+          TD_ARN_RAW=$(aws ecs list-task-definitions --family-prefix "$FAMILY" --status ACTIVE --sort DESC --max-items 5 --region ${{ secrets.AWS_REGION }} --query 'taskDefinitionArns' --output text || true)
+          TD_ARN=$(printf "%s" "$TD_ARN_RAW" | tr -d '\r' | tr ' ' '\n' | grep -m1 -E '^arn:aws:ecs:' || true)
+          if [ -n "$TD_ARN" ]; then
+            aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }}
+            aws ecs wait services-stable --cluster knapsack-test --services ${{ matrix.name }}-test --region ${{ secrets.AWS_REGION }} --no-paginate
+          fi

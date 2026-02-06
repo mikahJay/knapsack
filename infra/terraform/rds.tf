@@ -3,6 +3,8 @@
 resource "random_password" "db_master" {
   length  = 16
   special = true
+  # RDS disallows '/', '@', '"', and space in the master password.
+  override_special = "!#$%&'()*+,-.:;<=>?[]^_`{|}~"
 }
 
 resource "aws_db_subnet_group" "knapsack" {
