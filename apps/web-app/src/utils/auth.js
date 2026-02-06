@@ -11,14 +11,20 @@ export function setUser(user){
 export function clearUser(){
   localStorage.removeItem(STORAGE_KEY)
   try{ sessionStorage.removeItem('knapsack_id_token'); sessionStorage.removeItem('knapsack_access_token') }catch(e){}
+  try{ localStorage.removeItem('knapsack_id_token'); localStorage.removeItem('knapsack_access_token') }catch(e){}
 }
 
 export function setIdToken(token){
   try{ sessionStorage.setItem('knapsack_id_token', token) }catch(e){}
+  try{ localStorage.setItem('knapsack_id_token', token) }catch(e){}
 }
 
 export function getIdToken(){
-  try{ return sessionStorage.getItem('knapsack_id_token') }catch(e){return null}
+  try{
+    return sessionStorage.getItem('knapsack_id_token') || localStorage.getItem('knapsack_id_token')
+  }catch(e){
+    return null
+  }
 }
 
 export async function fetchGoogleProfile(accessToken){

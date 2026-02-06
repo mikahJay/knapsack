@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getUser, setUser, clearUser, fetchGoogleProfile, buildGoogleAuthUrl } from '../utils/auth'
+import { getUser, setUser, clearUser, fetchGoogleProfile, buildGoogleAuthUrl, setIdToken } from '../utils/auth'
 
 export default function NavBar(){
   const [user, setUserState] = useState(null)
@@ -39,8 +39,8 @@ export default function NavBar(){
               setUser(u)
               setUserState(u)
               // store tokens for API use
-              if(msg.id_token) try{ sessionStorage.setItem('knapsack_id_token', msg.id_token) }catch(e){}
-              if(msg.access_token) try{ sessionStorage.setItem('knapsack_access_token', msg.access_token) }catch(e){}
+              if(msg.id_token) setIdToken(msg.id_token)
+              if(msg.access_token) try{ sessionStorage.setItem('knapsack_access_token', msg.access_token); localStorage.setItem('knapsack_access_token', msg.access_token) }catch(e){}
             }catch(err){ console.error('profile fetch', err) }
             finally{
               sessionStorage.removeItem('knapsack_oauth_state')
@@ -56,7 +56,7 @@ export default function NavBar(){
           setUser(u)
           setUserState(u)
           // store id_token
-          if(msg && msg.id_token) try{ sessionStorage.setItem('knapsack_id_token', msg.id_token) }catch(e){}
+          if(msg && msg.id_token) setIdToken(msg.id_token)
           sessionStorage.removeItem('knapsack_oauth_state')
           sessionStorage.removeItem('knapsack_oauth_nonce')
         }
@@ -88,6 +88,7 @@ export default function NavBar(){
     clearUser()
     setUserState(null)
     try{ sessionStorage.removeItem('knapsack_id_token'); sessionStorage.removeItem('knapsack_access_token') }catch(e){}
+    try{ localStorage.removeItem('knapsack_id_token'); localStorage.removeItem('knapsack_access_token') }catch(e){}
     // navigate back to home and remove My Resources from view
     navigate('/')
   }
