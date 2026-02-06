@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { getUser } from '../utils/auth'
+import { getUser, getIdToken } from '../utils/auth'
 
 export default function FindNeedsPanel(){
   const [query, setQuery] = useState('')
@@ -14,7 +14,10 @@ export default function FindNeedsPanel(){
     try{
       const url = `${API_BASE}/needs?search=${encodeURIComponent(query)}`
       console.debug('FindNeedsPanel: fetching', url)
-      const res = await fetch(url)
+      const headers = {}
+      const idToken = getIdToken()
+      if (idToken) headers.Authorization = `Bearer ${idToken}`
+      const res = await fetch(url, { headers })
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       const user = getUser()

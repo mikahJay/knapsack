@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { getUser, buildGoogleAuthUrl } from '../utils/auth'
+import { getUser, getIdToken, buildGoogleAuthUrl } from '../utils/auth'
 
 function SlideDown({ open, children }) {
   return (
@@ -29,7 +29,10 @@ export default function MyNeedsPanel(){
     const user = getUser()
     if(!user || !user.email) return setItems([])
     try{
-      const res = await fetch(`${API_BASE}/needs?owner=${encodeURIComponent(user.email)}`)
+      const headers = {}
+      const idToken = getIdToken()
+      if (idToken) headers.Authorization = `Bearer ${idToken}`
+      const res = await fetch(`${API_BASE}/needs?owner=${encodeURIComponent(user.email)}`, { headers })
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setItems(data)
@@ -52,7 +55,7 @@ export default function MyNeedsPanel(){
     }
     try {
         const headers = { 'Content-Type': 'application/json' }
-        const idToken = sessionStorage.getItem('knapsack_id_token')
+        const idToken = getIdToken()
         if(idToken) headers['Authorization'] = `Bearer ${idToken}`
         const res = await fetch(`${API_BASE}/needs`, {
           method: 'POST',
@@ -128,9 +131,12 @@ export default function MyNeedsPanel(){
                           try{
                             const url = `${API_BASE}/needs/${it.id}/toggle-public`
                             const body = JSON.stringify({ public: newPublic })
+                            const headers = { 'Content-Type': 'application/json' }
+                            const idToken = getIdToken()
+                            if (idToken) headers.Authorization = `Bearer ${idToken}`
                             const res = await fetch(url, {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
+                              headers,
                               body
                             })
                             if(!res.ok){
