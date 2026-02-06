@@ -33,14 +33,35 @@ const defaultOrigins = [`https://${domainName}`, `https://www.${domainName}`]
 const envOrigins = (process.env.WEB_APP_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
 const webAppOrigin = process.env.WEB_APP_ORIGIN ? [process.env.WEB_APP_ORIGIN] : []
 const allowedOrigins = [...new Set([...webAppOrigin, ...envOrigins, ...defaultOrigins])]
+const allowedHosts = new Set([
+  domainName,
+  `www.${domainName}`
+])
+allowedOrigins.forEach(origin => {
+  try {
+    const url = new URL(origin)
+    if (url.hostname) allowedHosts.add(url.hostname)
+  } catch (err) {
+    // Ignore invalid origin strings
+  }
+})
 
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Permit ALB health checks (no Origin header) to reach /health
   if (req.path === '/health') return next()
   const origin = req.headers.origin
-  console.log(`Origin check: received="${origin}" allowed="${allowedOrigins.join(',')}" path="${req.path}"`)
-  if (origin && !allowedOrigins.includes(origin)) return res.status(403).json({ error: 'forbidden origin' })
+  if (origin) {
+    try {
+      const url = new URL(origin)
+      const allowed = allowedHosts.has(url.hostname)
+      console.log(`Origin check: received="${origin}" host="${url.hostname}" allowed_hosts="${[...allowedHosts].join(',')}" path="${req.path}"`)
+      if (!allowed) return res.status(403).json({ error: 'forbidden origin' })
+    } catch (err) {
+      console.log(`Origin check: received="${origin}" invalid origin path="${req.path}"`)
+      return res.status(403).json({ error: 'forbidden origin' })
+    }
+  }
   next()
 })
 
