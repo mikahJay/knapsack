@@ -6,7 +6,8 @@ import { BrowserRouter } from 'react-router-dom'
 
 vi.mock('../src/utils/auth', () => ({
   getUser: () => ({ email: 'test@example.com', name: 'Test User' }),
-  buildGoogleAuthUrl: () => '/auth-callback.html'
+  buildGoogleAuthUrl: () => '/auth-callback.html',
+  getIdToken: () => null
 }))
 
 describe('MyNeeds page', () => {
@@ -25,7 +26,7 @@ describe('MyNeeds page', () => {
     ]
 
     global.fetch.mockImplementation((url, opts) => {
-      if (url.includes('/me/needs') || url.includes('/needs?owner=')) {
+      if (url.includes('/needs') && (!opts || !opts.method)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(needs) })
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
@@ -50,7 +51,7 @@ describe('MyNeeds page', () => {
         call++
         return Promise.resolve({ ok: true, json: () => Promise.resolve(created) })
       }
-      if (url.includes('/me/needs') || url.includes('/needs?owner=')) {
+      if (url.includes('/needs') && (!opts || !opts.method)) {
         if (call === 0) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
         return Promise.resolve({ ok: true, json: () => Promise.resolve([created]) })
       }
@@ -74,11 +75,10 @@ describe('MyNeeds page', () => {
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument())
   })
 
-  test('requests needs for the current user and only shows those needs', async () => {
+  test('requests needs and shows returned items', async () => {
     const mine = { id: '10', name: 'Mine', description: 'mine', quantity: 1, public: false, owner: 'test@example.com' }
     global.fetch.mockImplementation((url, opts) => {
-      if (url.includes('/me/needs') || url.includes('/needs?owner=')) {
-        expect(url).toContain(encodeURIComponent('test@example.com'))
+      if (url.includes('/needs') && (!opts || !opts.method)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([mine]) })
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
@@ -104,7 +104,7 @@ describe('MyNeeds page', () => {
         postCalled = true
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...initial, public: true }) })
       }
-      if (url.includes('/me/needs') || url.includes('/needs?owner=')) {
+      if (url.includes('/needs') && (!opts || !opts.method)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([initial]) })
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })

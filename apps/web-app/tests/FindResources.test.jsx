@@ -4,7 +4,10 @@ import FindResources from '../src/pages/FindResources'
 import FindResourcesPanel from '../src/components/FindResourcesPanel'
 import { BrowserRouter } from 'react-router-dom'
 
-vi.mock('../src/utils/auth', () => ({ getUser: () => ({ email: 'me@example.com', name: 'Me' }) }))
+vi.mock('../src/utils/auth', () => ({
+  getUser: () => ({ email: 'me@example.com', name: 'Me' }),
+  getIdToken: () => null
+}))
 
 describe('Find Resources', () => {
   beforeEach(() => { global.fetch = vi.fn() })
@@ -13,8 +16,9 @@ describe('Find Resources', () => {
   test('shows only public items and marks owned items', async () => {
     const items = [
       { id: '1', name: 'Pub', description: 'p', public: true, owner: 'other@example.com' },
-      { id: '2', name: 'PrivMine', description: 'x', public: false, owner: 'me@example.com' },
-      { id: '3', name: 'Priv', description: 'y', public: false, owner: 'other@example.com' }
+      { id: '2', name: 'PubMine', description: 'x', public: true, owner: 'me@example.com' },
+      { id: '3', name: 'PrivMine', description: 'y', public: false, owner: 'me@example.com' },
+      { id: '4', name: 'Priv', description: 'z', public: false, owner: 'other@example.com' }
     ]
     global.fetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(items) })
 
@@ -24,8 +28,9 @@ describe('Find Resources', () => {
     fireEvent.click(screen.getByText('Search'))
 
     await waitFor(() => expect(screen.getByText('Pub')).toBeInTheDocument())
-    const mineEl = screen.getByText(/PrivMine/)
+    const mineEl = screen.getByText(/PubMine/)
     expect(mineEl).toBeInTheDocument()
+    expect(screen.queryByText('PrivMine')).toBeNull()
     expect(screen.queryByText('Priv')).toBeNull()
     // owned is marked
     expect(mineEl.textContent).toContain('(mine)')

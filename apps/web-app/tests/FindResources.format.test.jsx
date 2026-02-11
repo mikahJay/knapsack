@@ -3,7 +3,10 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import FindResourcesPanel from '../src/components/FindResourcesPanel'
 import { BrowserRouter } from 'react-router-dom'
 
-vi.mock('../src/utils/auth', () => ({ getUser: () => ({ email: 'me@example.com', name: 'Me' }) }))
+vi.mock('../src/utils/auth', () => ({
+  getUser: () => ({ email: 'me@example.com', name: 'Me' }),
+  getIdToken: () => null
+}))
 
 describe('Find Resources formatting', () => {
   beforeEach(() => { global.fetch = vi.fn() })

@@ -32,7 +32,7 @@ export default function MyNeedsPanel(){
       const headers = {}
       const idToken = getIdToken()
       if (idToken) headers.Authorization = `Bearer ${idToken}`
-      const res = await fetch(`${API_BASE}/needs?owner=${encodeURIComponent(user.email)}`, { headers })
+      const res = await fetch(`${API_BASE}/needs`, { headers })
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setItems(data)

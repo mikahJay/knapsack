@@ -6,7 +6,8 @@ import { BrowserRouter } from 'react-router-dom'
 
 vi.mock('../src/utils/auth', () => ({
   getUser: () => ({ email: 'test@example.com', name: 'Test User' }),
-  buildGoogleAuthUrl: () => '/auth-callback.html'
+  buildGoogleAuthUrl: () => '/auth-callback.html',
+  getIdToken: () => null
 }))
 
 describe('MyResources page', () => {
@@ -25,7 +26,7 @@ describe('MyResources page', () => {
     ]
 
     global.fetch.mockImplementation((url, opts) => {
-      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+      if (url.includes('/resources') && (!opts || !opts.method)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(resources) })
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
@@ -53,7 +54,7 @@ describe('MyResources page', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(created) })
       }
       // GET list
-      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+      if (url.includes('/resources') && (!opts || !opts.method)) {
         if (call === 0) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
         return Promise.resolve({ ok: true, json: () => Promise.resolve([created]) })
       }
@@ -82,15 +83,11 @@ describe('MyResources page', () => {
     await waitFor(() => expect(screen.getByText('New')).toBeInTheDocument())
   })
 
-  test("requests resources for the current user and only shows those resources", async () => {
+  test('requests resources and shows returned items', async () => {
     const mine = { id: '10', name: 'Mine', description: 'mine', quantity: 1, public: false, owner: 'test@example.com' }
-    const theirs = { id: '11', name: 'Theirs', description: 'theirs', quantity: 2, public: true, owner: 'other@example.com' }
 
     global.fetch.mockImplementation((url, opts) => {
-      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
-        // verify the component included the current user's email in the query
-        expect(url).toContain(encodeURIComponent('test@example.com'))
-        // simulate server-side filtering: return only the current user's resources
+      if (url.includes('/resources') && (!opts || !opts.method)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([mine]) })
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })
@@ -103,7 +100,6 @@ describe('MyResources page', () => {
     )
 
     await waitFor(() => expect(screen.getByText('Mine')).toBeInTheDocument())
-    expect(screen.queryByText('Theirs')).toBeNull()
   })
 
   test('toggles public flag and updates UI color/text', async () => {
@@ -117,7 +113,7 @@ describe('MyResources page', () => {
         postCalled = true
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...initial, public: true }) })
       }
-      if (url.includes('/me/resources') || url.includes('/resources?owner=')) {
+      if (url.includes('/resources') && (!opts || !opts.method)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([initial]) })
       }
       return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('not found') })

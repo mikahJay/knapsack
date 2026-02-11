@@ -3,7 +3,10 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import FindNeedsPanel from '../src/components/FindNeedsPanel'
 import { BrowserRouter } from 'react-router-dom'
 
-vi.mock('../src/utils/auth', () => ({ getUser: () => ({ email: 'me@example.com', name: 'Me' }) }))
+vi.mock('../src/utils/auth', () => ({
+  getUser: () => ({ email: 'me@example.com', name: 'Me' }),
+  getIdToken: () => null
+}))
 
 describe('Find Needs formatting', () => {
   beforeEach(() => { global.fetch = vi.fn() })

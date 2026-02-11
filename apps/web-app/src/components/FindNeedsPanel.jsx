@@ -20,9 +20,7 @@ export default function FindNeedsPanel(){
       const res = await fetch(url, { headers })
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
-      const user = getUser()
-      const email = user && user.email
-      const filtered = data.filter(it => it.public || (email && it.owner === email))
+      const filtered = data.filter(it => it.public)
       setItems(filtered)
       setStatus(null)
     }catch(err){

@@ -33,7 +33,7 @@ export default function MyResourcesPanel(){
       const headers = {}
       const idToken = getIdToken()
       if (idToken) headers.Authorization = `Bearer ${idToken}`
-      const res = await fetch(`${API_BASE}/resources?owner=${encodeURIComponent(user.email)}`, { headers })
+      const res = await fetch(`${API_BASE}/resources`, { headers })
       if(!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setItems(data)
