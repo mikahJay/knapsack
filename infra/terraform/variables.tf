@@ -40,7 +40,7 @@ variable "google_client_id" {
   type        = string
   default     = ""
   validation {
-    condition     = length(trim(var.google_client_id)) > 0
+    condition     = length(trimspace(var.google_client_id)) > 0
     error_message = "google_client_id must be set (TF_VAR_google_client_id or terraform.tfvars)."
   }
 }
