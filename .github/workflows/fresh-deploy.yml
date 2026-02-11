@@ -131,4 +131,5 @@ jobs:
           if [ -n "$TD_ARN" ]; then
             aws ecs update-service --cluster knapsack-test --service ${{ matrix.name }}-test --task-definition "$TD_ARN" --force-new-deployment --region ${{ secrets.AWS_REGION }}
             aws ecs wait services-stable --cluster knapsack-test --services ${{ matrix.name }}-test --region ${{ secrets.AWS_REGION }} --no-paginate
+            echo "Service is stable."
           fi

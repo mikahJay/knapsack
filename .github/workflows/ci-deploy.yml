@@ -349,6 +349,7 @@ jobs:
                 aws logs tail /ecs/${{ matrix.name }}-test --region ${{ secrets.AWS_REGION }} --since 30m || true
                 exit 1
               fi
+              echo "Service is stable."
             else
               echo "No task definition found for family $FAMILY"
             fi
