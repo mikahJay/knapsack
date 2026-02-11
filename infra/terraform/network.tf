@@ -111,6 +111,11 @@ resource "aws_instance" "nat" {
               # Add MASQUERADE rule for NAT
               iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
               
+              # Allow forwarding for private subnet traffic
+              iptables -P FORWARD ACCEPT
+              iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+              iptables -A FORWARD -s 10.0.0.0/16 -j ACCEPT
+              
               # Save iptables rules
               service iptables save
               

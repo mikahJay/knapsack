@@ -1,0 +1,12 @@
+{
+    "events": [
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "id token verify failed (authRequired) {",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555904"
+        }
+    ],
+    "searchedLogStreams": []
+}

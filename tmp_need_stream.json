@@ -1,0 +1,75 @@
+{
+    "events": [
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "id token verify failed (authRequired) {",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555904"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  message: 'verifyIdToken timeout',",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555905"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  code: 'ETIMEDOUT',",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555906"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  errno: undefined,",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555907"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  syscall: undefined,",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555908"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  hostname: undefined,",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555909"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  tokenLength: 1294,",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555910"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  errorType: 'Error',",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555911"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "  fullError: '{\\n  \"code\": \"ETIMEDOUT\"\\n}'",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555912"
+        },
+        {
+            "logStreamName": "ecs/need-server/e182c0560cce44d0b1ed1dcd2cdb6c70",
+            "timestamp": 1770846738802,
+            "message": "}",
+            "ingestionTime": 1770846739476,
+            "eventId": "39491201907672314034658221119051015951958390707202555913"
+        }
+    ],
+    "searchedLogStreams": []
+}
