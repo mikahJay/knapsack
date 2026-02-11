@@ -39,6 +39,10 @@ variable "google_client_id" {
   description = "Google OAuth client ID for verifying ID tokens in resource-server"
   type        = string
   default     = ""
+  validation {
+    condition     = length(trim(var.google_client_id)) > 0
+    error_message = "google_client_id must be set (TF_VAR_google_client_id or terraform.tfvars)."
+  }
 }
 
 variable "image_tag" {
