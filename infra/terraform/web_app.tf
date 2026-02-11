@@ -18,6 +18,13 @@ resource "aws_ecs_task_definition" "web_app" {
       portMappings = [
         { containerPort = 80, protocol = "tcp" }
       ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 10
+      }
       environment = [
         {
           name  = "NODE_ENV"

@@ -19,6 +19,13 @@ resource "aws_ecs_task_definition" "need_server" {
       portMappings = [
         { containerPort = 4020, protocol = "tcp" }
       ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:4020/health', res => { process.exit(res.statusCode >= 200 && res.statusCode < 400 ? 0 : 1) }).on('error', () => process.exit(1))\""]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 10
+      }
       secrets = [
         {
           name      = "DB_CREDENTIALS"

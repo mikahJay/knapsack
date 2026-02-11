@@ -107,7 +107,7 @@ resource "aws_lb_target_group" "web_app_tg" {
   target_type = "ip"
 
   health_check {
-    path                = "/"
+    path                = "/health"
     matcher             = "200-399"
     interval            = 30
     timeout             = 5
