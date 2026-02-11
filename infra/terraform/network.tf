@@ -97,12 +97,27 @@ resource "aws_instance" "nat" {
   source_dest_check           = false
   user_data                   = <<-EOF
               #!/bin/bash
-              set -e
-              sysctl -w net.ipv4.ip_forward=1
-              echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-              iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+              set -ex
+              
+              # Enable IP forwarding permanently
+              echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-nat.conf
+              sysctl -p /etc/sysctl.d/99-nat.conf
+              
+              # Install and enable iptables-services to persist rules across reboots
               yum install -y iptables-services
+              systemctl enable iptables
+              systemctl start iptables
+              
+              # Add MASQUERADE rule for NAT
+              iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+              
+              # Save iptables rules
               service iptables save
+              
+              # Verify configuration
+              echo "NAT configuration complete"
+              iptables -t nat -L -n -v
+              cat /proc/sys/net/ipv4/ip_forward
               EOF
 
   tags = {
