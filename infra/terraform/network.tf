@@ -95,6 +95,15 @@ resource "aws_instance" "nat" {
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.nat_sg.id]
   source_dest_check           = false
+  user_data                   = <<-EOF
+              #!/bin/bash
+              set -e
+              sysctl -w net.ipv4.ip_forward=1
+              echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+              iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+              yum install -y iptables-services
+              service iptables save
+              EOF
 
   tags = {
     Name = "knapsack-nat-${var.environment}"
