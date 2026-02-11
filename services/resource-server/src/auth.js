@@ -73,7 +73,9 @@ async function authRequired(req, res, next){
       errno: err && err.errno,
       syscall: err && err.syscall,
       hostname: err && err.hostname,
-      stack: err && err.stack
+      tokenLength: token && token.length,
+      errorType: err && err.constructor && err.constructor.name,
+      fullError: err && JSON.stringify(err, null, 2)
     })
     return res.status(401).json({ error: 'invalid id_token' })
   }
