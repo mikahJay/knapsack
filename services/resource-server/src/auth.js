@@ -5,8 +5,24 @@ const oauth2Client = googleClientId ? new OAuth2Client(googleClientId) : null
 
 async function verifyIdToken(idToken) {
   if (!oauth2Client) throw new Error('GOOGLE_CLIENT_ID not configured')
-  const ticket = await oauth2Client.verifyIdToken({ idToken, audience: googleClientId })
-  return ticket.getPayload()
+  const timeoutMs = Number.parseInt(process.env.GOOGLE_VERIFY_TIMEOUT_MS || '5000', 10)
+  let timeoutId
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const err = new Error('verifyIdToken timeout')
+      err.code = 'ETIMEDOUT'
+      reject(err)
+    }, Number.isFinite(timeoutMs) ? timeoutMs : 5000)
+  })
+  try {
+    const ticket = await Promise.race([
+      oauth2Client.verifyIdToken({ idToken, audience: googleClientId }),
+      timeoutPromise
+    ])
+    return ticket.getPayload()
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
 }
 
 // middleware: if Authorization: Bearer <id_token> header present, verify and attach req.user

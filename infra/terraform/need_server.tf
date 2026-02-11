@@ -81,7 +81,7 @@ resource "aws_ecs_service" "need_server" {
     assign_public_ip = false
   }
 
-  desired_count = 1
+  desired_count = 2
 
   load_balancer {
     target_group_arn = aws_lb_target_group.need_server_tg.arn
