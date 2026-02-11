@@ -180,8 +180,8 @@ resource "aws_lb_listener_rule" "need_path_https" {
 
     condition {
       path_pattern {
-        # match the plural /needs route and subpaths used by the SPA
-        values = ["/needs", "/needs/*"]
+        # match the plural /needs route and subpaths used by the SPA, plus /test-google for debugging
+        values = ["/needs", "/needs/*", "/test-google", "/test-google/*"]
       }
     }
 }
