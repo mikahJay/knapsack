@@ -49,7 +49,7 @@ allowedOrigins.forEach(origin => {
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Permit ALB health checks (no Origin header) to reach /health
-  if (req.path === '/health') return next()
+  if (req.path === '/health' || req.path === '/test-google') return next()
   const origin = req.headers.origin
   if (origin) {
     try {
@@ -70,11 +70,32 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Allow health checks to bypass authentication
-  if (req.path === '/health') return next()
+  if (req.path === '/health' || req.path === '/test-google') return next()
   return authRequired(req, res, next)
 })
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'need-server' }))
+
+// Test Google API reachability for debugging NAT connectivity
+app.get('/test-google', async (req, res) => {
+  const https = require('https')
+  const startTime = Date.now()
+  https.get('https://oauth2.googleapis.com/.well-known/openid-configuration', (resp) => {
+    let data = ''
+    resp.on('data', (chunk) => { data += chunk })
+    resp.on('end', () => {
+      const elapsed = Date.now() - startTime
+      res.json({ status: 'ok', elapsed, statusCode: resp.statusCode, dataLength: data.length })
+    })
+  }).on('error', (err) => {
+    const elapsed = Date.now() - startTime
+    res.status(500).json({ status: 'error', elapsed, message: err.message, code: err.code, errno: err.errno, hostname: err.hostname })
+  }).setTimeout(10000, function() {
+    const elapsed = Date.now() - startTime
+    this.destroy()
+    res.status(504).json({ status: 'timeout', elapsed })
+  })
+})
 
 // List / search needs
 app.get('/needs', async (req, res) => {
