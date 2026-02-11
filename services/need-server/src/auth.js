@@ -21,7 +21,14 @@ async function authOptional(req, res, next){
     req.user = { email: payload.email, name: payload.name, sub: payload.sub }
     return next()
   }catch(err){
-    console.error('id token verify failed', err && err.message)
+    console.error('id token verify failed (authOptional)', {
+      message: err && err.message,
+      code: err && err.code,
+      errno: err && err.errno,
+      syscall: err && err.syscall,
+      hostname: err && err.hostname,
+      stack: err && err.stack
+    })
     return res.status(401).json({ error: 'invalid id_token' })
   }
 }
@@ -44,7 +51,14 @@ async function authRequired(req, res, next){
     req.user = { email: payload.email, name: payload.name, sub: payload.sub }
     return next()
   }catch(err){
-    console.error('id token verify failed', err && err.message)
+    console.error('id token verify failed (authRequired)', {
+      message: err && err.message,
+      code: err && err.code,
+      errno: err && err.errno,
+      syscall: err && err.syscall,
+      hostname: err && err.hostname,
+      stack: err && err.stack
+    })
     return res.status(401).json({ error: 'invalid id_token' })
   }
 }
