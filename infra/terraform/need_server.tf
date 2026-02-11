@@ -74,6 +74,7 @@ resource "aws_ecs_service" "need_server" {
   cluster         = aws_ecs_cluster.knapsack.id
   task_definition = aws_ecs_task_definition.need_server.arn
   launch_type     = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
