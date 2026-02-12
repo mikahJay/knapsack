@@ -49,7 +49,7 @@ export default function MyNeedsPanel(){
       const headers = {}
       const idToken = getIdToken()
       if (idToken) headers.Authorization = `Bearer ${idToken}`
-      const res = await fetch(`${MATCH_API_BASE}/match/needs/${needId}/candidates`, { headers })
+      const res = await fetch(`${MATCH_API_BASE}/needs/${needId}/candidates`, { headers })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setMatches(prev => ({ ...prev, [needId]: data }))

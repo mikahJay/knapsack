@@ -49,7 +49,7 @@ allowedOrigins.forEach(origin => {
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Permit ALB health checks (no Origin header) to reach /health
-  if (req.path === '/health' || req.path === '/test-google') return next()
+  if (req.path === '/health' || req.path === '/needs/health' || req.path === '/test-google') return next()
   const origin = req.headers.origin
   if (origin) {
     try {
@@ -70,11 +70,12 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Allow health checks to bypass authentication
-  if (req.path === '/health' || req.path === '/test-google') return next()
+  if (req.path === '/health' || req.path === '/needs/health' || req.path === '/test-google') return next()
   return authRequired(req, res, next)
 })
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'need-server' }))
+app.get('/needs/health', (req, res) => res.json({ status: 'ok', service: 'need-server' }))
 
 // Test Google API reachability for debugging NAT connectivity
 app.get('/test-google', async (req, res) => {

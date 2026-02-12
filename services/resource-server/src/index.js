@@ -69,13 +69,14 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Allow health checks to bypass authentication
-  if (req.path === '/health') return next()
+  if (req.path === '/health' || req.path === '/resources/health') return next()
   return authRequired(req, res, next)
 })
 
 const { pool, initDb } = require('./db')
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'resource-server' }))
+app.get('/resources/health', (req, res) => res.json({ status: 'ok', service: 'resource-server' }))
 
 // root (/) and /resources endpoints are used; remove singular /resource shortcut for consistency
 
