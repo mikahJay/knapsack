@@ -4,13 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type 'yes' to destroy and redeploy the test environment"
+        description: "Type 'yes' to destroy the test environment"
         required: true
         default: "no"
         type: choice
         options:
           - no
           - yes
+      redeploy:
+        description: "Redeploy after destroying?"
+        required: true
+        default: "yes"
+        type: choice
+        options:
+          - yes
+          - no
 
 jobs:
   destroy:
@@ -49,6 +57,7 @@ jobs:
   deploy:
     name: Recreate and deploy services
     needs: destroy
+    if: ${{ inputs.confirm == 'yes' && inputs.redeploy == 'yes' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
