@@ -41,12 +41,14 @@ async function main() {
     env.VITE_API_RESOURCE = `${VITE_API_BASE}`
     // Use local auth service for development (no HTTPS endpoint yet)
     env.VITE_API_AUTH = 'http://localhost:4001/auth'
+    env.VITE_API_MATCH = `${VITE_API_BASE}`
     env.VITE_API_BASE = VITE_API_BASE
   } else {
     // local ports for services
     env.VITE_API_NEED = 'http://localhost:4020/need'
     env.VITE_API_RESOURCE = 'http://localhost:4010/resource'
     env.VITE_API_AUTH = 'http://localhost:4001/auth'
+    env.VITE_API_MATCH = 'http://localhost:4030/match'
     env.VITE_API_BASE = 'http://localhost:5173'
   }
 
@@ -55,6 +57,7 @@ async function main() {
   console.log('  VITE_API_NEED=', env.VITE_API_NEED)
   console.log('  VITE_API_RESOURCE=', env.VITE_API_RESOURCE)
   console.log('  VITE_API_AUTH=', env.VITE_API_AUTH)
+  console.log('  VITE_API_MATCH=', env.VITE_API_MATCH)
 
   // Spawn Vite through the shell to avoid Windows spawn EINVAL issues
   const cmd = process.platform === 'win32' ? 'npx.cmd vite' : 'npx vite'

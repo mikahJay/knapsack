@@ -47,6 +47,11 @@ resource "aws_ecs_task_definition" "web_app" {
           value = "https://${var.domain_name}/auth"
         }
         ,{
+          name  = "VITE_API_MATCH"
+          # match endpoints live under the same public domain
+          value = "https://${var.domain_name}/match"
+        }
+        ,{
           name  = "VITE_GOOGLE_CLIENT_ID"
           value = var.google_client_id
         }

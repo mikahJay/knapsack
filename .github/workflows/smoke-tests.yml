@@ -37,6 +37,12 @@ jobs:
           chmod +x smoke.sh
           ENV=test ./smoke.sh
 
+      - name: Run match-server smoke test
+        working-directory: services/match-server/tests/smoke
+        run: |
+          chmod +x smoke.sh
+          ENV=test ./smoke.sh
+
       - name: Run web-app smoke test
         uses: actions/setup-node@v4
         with:

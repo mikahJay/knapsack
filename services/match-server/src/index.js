@@ -1,6 +1,7 @@
 const express = require('express')
 const bodyParser = require('body-parser')
 const { authRequired } = require('./auth')
+const { pool, initDb } = require('./db')
 
 const app = express()
 const port = process.env.PORT || 4030
@@ -74,6 +75,66 @@ app.use((req, res, next) => {
 })
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'match-server' }))
+
+// Get match candidates for a specific need
+app.get('/match/needs/:needId/candidates', async (req, res) => {
+  const { needId } = req.params
+  
+  // Hardcoded random matches for now - no database query
+  const resourceNames = [
+    'Winter Clothing Bundle',
+    'Food Supplies Package',
+    'Medical Equipment Set',
+    'Educational Materials',
+    'Furniture Collection',
+    'Kitchen Essentials',
+    'Baby Care Items',
+    'Hygiene Products Set',
+    'Sports Equipment',
+    'Tech Devices Bundle'
+  ]
+  
+  const matchReasons = [
+    'Geographic proximity and similar category match',
+    'High compatibility based on quantity and timing',
+    'Strong semantic match in description keywords',
+    'Donor has history of similar successful matches',
+    'Urgent need timeframe aligns with availability',
+    'Category and subcategory exact match',
+    'Machine learning confidence score above threshold',
+    'Community preference and prior engagement',
+    'Seasonal demand patterns indicate good fit',
+    'Logistics efficiency and cost optimization'
+  ]
+  
+  // Generate 0-5 random matches
+  const numMatches = Math.floor(Math.random() * 6)
+  const matches = []
+  
+  for (let i = 0; i < numMatches; i++) {
+    const randomHoursAgo = Math.random() * 24
+    const createdAt = new Date(Date.now() - randomHoursAgo * 60 * 60 * 1000)
+    
+    matches.push({
+      id: `match-${Math.random().toString(36).substr(2, 9)}`,
+      need_id: needId,
+      resource_id: `resource-${Math.random().toString(36).substr(2, 9)}`,
+      resource_name: resourceNames[Math.floor(Math.random() * resourceNames.length)],
+      match_reason: matchReasons[Math.floor(Math.random() * matchReasons.length)],
+      match_statistics: {
+        confidence: Math.random() * 0.3 + 0.7, // 0.7 to 1.0
+        score: Math.floor(Math.random() * 30) + 70 // 70 to 100
+      },
+      created_at: createdAt.toISOString(),
+      selected: false
+    })
+  }
+  
+  // Sort by created_at descending (newest first)
+  matches.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  
+  res.json(matches)
+})
 
 // Match a need against available resources
 // Returns hard-coded dummy resources for now
@@ -154,6 +215,11 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
 
-app.listen(port, () => {
-  console.log(`Match server listening on port ${port}`)
+initDb().then(() => {
+  app.listen(port, () => {
+    console.log(`Match server listening on port ${port}`)
+  })
+}).catch(err => {
+  console.error('Failed to initialize database:', err)
+  process.exit(1)
 })

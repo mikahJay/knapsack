@@ -26,7 +26,30 @@ resource "aws_ecs_task_definition" "match_server" {
         retries     = 3
         startPeriod = 10
       }
+      secrets = [
+        {
+          name      = "DB_CREDENTIALS"
+          valueFrom = aws_secretsmanager_secret.db_credentials.arn
+        }
+      ]
       environment = [
+        {
+          name  = "DB_HOST"
+          value = aws_db_instance.knapsack.address
+        },
+        {
+          name  = "DB_PORT"
+          value = tostring(aws_db_instance.knapsack.port)
+        },
+        {
+          name  = "DB_NAME"
+          value = aws_db_instance.knapsack.db_name
+        }
+        ,
+        {
+          name  = "DB_SSL"
+          value = "true"
+        },
         {
           name  = "GOOGLE_CLIENT_ID"
           value = var.google_client_id
