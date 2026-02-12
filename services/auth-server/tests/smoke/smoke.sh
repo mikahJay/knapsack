@@ -26,8 +26,8 @@ if [ -z "$ALB_DNS" ] || [ "$ALB_DNS" = "None" ]; then
   exit 4
 fi
 
-URL="http://$ALB_DNS${PATH_TO_CHECK}"
+URL="https://$ALB_DNS${PATH_TO_CHECK}"
 echo "Requesting $URL"
-STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "$URL" || true)
+STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "$URL" || true)
 echo "HTTP status: $STATUS"
 [ "$STATUS" -eq 200 ] && (echo "OK" && exit 0) || (echo "FAIL" && exit 5)
