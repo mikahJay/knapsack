@@ -25,7 +25,7 @@ if [ -z "$ALB_DNS" ] || [ "$ALB_DNS" = "None" ]; then
   exit 4
 fi
 
-URL="https://$ALB_DNS/needs"
+URL="https://$ALB_DNS/needs/health"
 echo "Requesting $URL"
 STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "$URL" || true)
 echo "HTTP status: $STATUS"
