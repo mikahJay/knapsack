@@ -15,6 +15,7 @@ on:
           - resource-server
           - need-server
           - auth-server
+          - match-server
           - web-app
 
 jobs:
@@ -51,7 +52,7 @@ jobs:
 
       - name: Ensure ECR repositories exist
         run: |
-          for repo in need-server-test resource-server-test auth-server-test web-app-test; do
+          for repo in need-server-test resource-server-test auth-server-test match-server-test web-app-test; do
             if ! aws ecr describe-repositories --repository-names "$repo" >/dev/null 2>&1; then
               aws ecr create-repository --repository-name "$repo"
             fi
@@ -76,6 +77,7 @@ jobs:
             -target=aws_lb_target_group.need_server_tg \
             -target=aws_lb_target_group.resource_server_tg \
             -target=aws_lb_target_group.auth_server_tg \
+            -target=aws_lb_target_group.match_server_tg \
             -target=aws_lb_target_group.web_app_tg \
             -target=aws_lb_listener.http \
             -target=aws_lb_listener.http \
@@ -127,6 +129,10 @@ jobs:
             repo: auth-server-test
             context: services/auth-server
             tf_name: auth_server
+          - name: match-server
+            repo: match-server-test
+            context: services/match-server
+            tf_name: match_server
           - name: web-app
             repo: web-app-test
             context: apps/web-app

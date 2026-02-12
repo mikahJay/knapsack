@@ -16,8 +16,8 @@ resource "aws_ecr_repository" "need_server" {
   force_delete      = true
 }
 
-resource "aws_ecr_repository" "matcher" {
-  name              = "matcher-${var.environment}"
+resource "aws_ecr_repository" "match_server" {
+  name              = "match-server-${var.environment}"
   force_delete      = true
 }
 

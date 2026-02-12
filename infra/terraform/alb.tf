@@ -99,6 +99,23 @@ resource "aws_lb_target_group" "auth_server_tg" {
   }
 }
 
+resource "aws_lb_target_group" "match_server_tg" {
+  name        = "match-server-tg-${var.environment}"
+  port        = 4030
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.knapsack.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
 resource "aws_lb_target_group" "web_app_tg" {
   name        = "web-app-tg-${var.environment}"
   port        = 80
@@ -205,6 +222,24 @@ resource "aws_lb_listener_rule" "auth_path_https" {
   }
 }
 
+resource "aws_lb_listener_rule" "match_path_https" {
+  count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 150
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.match_server_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      # match /match and /match/* for match-server routes
+      values = ["/match", "/match/*"]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "web_path_https" {
   count        = (var.acm_certificate_arn != "" || var.create_acm) ? 1 : 0
   listener_arn = aws_lb_listener.https[0].arn
@@ -250,6 +285,15 @@ resource "aws_security_group_rule" "alb_to_service_auth" {
   type                     = "ingress"
   from_port                = 4001
   to_port                  = 4001
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.service_sg.id
+  source_security_group_id = aws_security_group.alb_sg.id
+}
+
+resource "aws_security_group_rule" "alb_to_service_match" {
+  type                     = "ingress"
+  from_port                = 4030
+  to_port                  = 4030
   protocol                 = "tcp"
   security_group_id        = aws_security_group.service_sg.id
   source_security_group_id = aws_security_group.alb_sg.id
