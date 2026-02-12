@@ -77,9 +77,9 @@ resource "aws_ecs_service" "need_server" {
   enable_execute_command = true
 
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.service_sg.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   desired_count = 2
