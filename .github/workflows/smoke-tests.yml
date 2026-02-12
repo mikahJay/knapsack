@@ -1,0 +1,47 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  smoke-test:
+    name: Run smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run need-server smoke test
+        working-directory: services/need-server/tests/smoke
+        run: |
+          chmod +x smoke.sh
+          ENV=test ./smoke.sh
+
+      - name: Run resource-server smoke test
+        working-directory: services/resource-server/tests/smoke
+        run: |
+          chmod +x smoke.sh
+          ENV=test ./smoke.sh
+
+      - name: Run auth-server smoke test
+        working-directory: services/auth-server/tests/smoke
+        run: |
+          chmod +x smoke.sh
+          ENV=test ./smoke.sh
+
+      - name: Run web-app smoke test
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Web app smoke test
+        run: |
+          node apps/web-app/tests/smoke/smoke.js https://knap-sack.com

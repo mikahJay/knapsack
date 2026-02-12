@@ -376,3 +376,10 @@ jobs:
               echo "Runtime env-config.js contains VITE_GOOGLE_CLIENT_ID"
             fi
           fi
+
+  smoke-tests:
+    name: Smoke tests (post-deploy verification)
+    needs: deploy
+    if: success()
+    uses: ./.github/workflows/smoke-tests.yml
+    secrets: inherit

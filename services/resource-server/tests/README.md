@@ -1,4 +1,4 @@
-# Web App Tests
+# Server Tests
 
 ## Test Types
 
@@ -6,15 +6,14 @@ All tests default to **unit tests**. To mark a test as a different type, add a t
 
 - **Unit tests** (default): No tag needed
 - **Integration tests**: Add `@integration` to the test name
-- **Smoke tests**: Located in `tests/smoke/` directory
 
 Example:
 ```javascript
 // Unit test (default)
-test('calculates sum correctly', () => { ... })
+it('returns 200 for valid input', () => { ... })
 
 // Integration test
-test('fetches data from API @integration', () => { ... })
+it('connects to real database @integration', () => { ... })
 ```
 
 ## Running Tests
@@ -31,22 +30,13 @@ npm test -- --run --testNamePattern='@integration'
 
 # Run all tests
 npm test -- --run
+
+# Run with coverage
+npm run coverage
 ```
 
-## Smoke Tests
+## Writing Tests
 
-Smoke test for the `web-app` project.
-
-Run the smoke test from the repository root or from `apps/web-app`:
-
-```powershell
-# from repo root
-node apps/web-app/tests/smoke/smoke.js
-
-# or specify a URL
-node apps/web-app/tests/smoke/smoke.js http://localhost:5174/
-```
-
-Exit codes:
-- `0` success (HTTP 200)
-- non-zero failure
+- Mock external dependencies (database, APIs) for unit tests
+- Use real connections only for integration tests (tagged with `@integration`)
+- Keep tests fast and isolated
