@@ -16,11 +16,6 @@ variable "deploy_principals" {
   default     = []
 }
 
-variable "nat_instance_type" {
-  description = "Instance type to use for the NAT instance (dev = cheaper)"
-  type        = string
-  default     = "t3.micro"
-}
 // (duplicate aws_region removed)
 
 variable "db_username" {

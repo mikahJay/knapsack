@@ -66,78 +66,9 @@ resource "aws_subnet" "private" {
   }
 }
 
-// NAT instance (cheaper for dev): single-instance NAT
-resource "aws_security_group" "nat_sg" {
-  name   = "knapsack-nat-sg-${var.environment}"
-  vpc_id = aws_vpc.knapsack.id
-
-  description = "Security group for NAT instance"
-
-  ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [aws_vpc.knapsack.cidr_block]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_instance" "nat" {
-  ami                         = data.aws_ami.amazon_linux.id
-  instance_type               = var.nat_instance_type
-  subnet_id                   = aws_subnet.public[0].id
-  associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.nat_sg.id]
-  source_dest_check           = false
-  user_data                   = <<-EOF
-              #!/bin/bash
-              set -ex
-              
-              # Enable IP forwarding permanently
-              echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-nat.conf
-              sysctl -p /etc/sysctl.d/99-nat.conf
-              
-              # Install and enable iptables-services to persist rules across reboots
-              yum install -y iptables-services
-              systemctl enable iptables
-              systemctl start iptables
-              
-              # Add MASQUERADE rule for NAT
-              iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-              
-              # Allow forwarding for private subnet traffic
-              iptables -P FORWARD ACCEPT
-              iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-              iptables -A FORWARD -s 10.0.0.0/16 -j ACCEPT
-              
-              # Save iptables rules
-              service iptables save
-              
-              # Verify configuration
-              echo "NAT configuration complete"
-              iptables -t nat -L -n -v
-              cat /proc/sys/net/ipv4/ip_forward
-              EOF
-
-  tags = {
-    Name = "knapsack-nat-${var.environment}"
-  }
-}
-
+// Private route table for database subnets (no internet access needed)
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.knapsack.id
-}
-
-resource "aws_route" "private_nat" {
-  route_table_id         = aws_route_table.private.id
-  destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = aws_instance.nat.primary_network_interface_id
 }
 
 resource "aws_route_table_association" "private" {
