@@ -11,7 +11,8 @@ app.use((req, res, next) => {
   next()
 })
 
-app.get('/health', (req, res) => res.json({status: 'ok', service: 'auth-server'}))app.get('/auth/health', (req, res) => res.json({ status: 'ok', service: 'auth-server' }))
+app.get('/health', (req, res) => res.json({status: 'ok', service: 'auth-server'}))
+app.get('/auth/health', (req, res) => res.json({ status: 'ok', service: 'auth-server' }))
 // Support ALB path /auth so requests routed to /auth return 200 as well
 app.get('/auth', (req, res) => res.sendStatus(200))
 
