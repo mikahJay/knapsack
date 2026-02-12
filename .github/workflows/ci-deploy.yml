@@ -61,7 +61,7 @@ jobs:
       - name: Terraform init & network + DB apply
         run: |
           terraform -chdir=infra/terraform init -input=false -reconfigure || { echo "terraform init failed"; exit 1; }
-          terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" \
+          terraform -chdir=infra/terraform apply -lock-timeout=600s -var="environment=test" \
             -target=aws_vpc.knapsack \
             -target=aws_internet_gateway.igw \
             -target=aws_subnet.public \
@@ -114,7 +114,7 @@ jobs:
       DEPLOY_TARGET: ${{ github.event.inputs.deploy_target || 'all' }}
     strategy:
       fail-fast: false
-      max-parallel: 1  # Serialize to avoid Terraform lock conflicts
+      max-parallel: 3  # Run 3 services in parallel; docker builds are the bottleneck
       matrix:
         include:
           - name: need-server
@@ -232,9 +232,9 @@ jobs:
           if echo "$OUT" | grep -q "ServiceNotFoundException" || [ "$SERVICE_STATUS" = "NOTFOUND" ]; then
             echo "${{ matrix.name }} service not found; running Terraform to create cluster, task def and service..."
             # Ensure CloudWatch log group exists first
-            terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_cloudwatch_log_group.${{ matrix.tf_name }} -auto-approve || echo "Log group may already exist"
+            terraform -chdir=infra/terraform apply -lock-timeout=600s -var="environment=test" -target=aws_cloudwatch_log_group.${{ matrix.tf_name }} -auto-approve || echo "Log group may already exist"
             # Create cluster, task definition, and service
-            terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.${{ matrix.tf_name }} -target=aws_ecs_service.${{ matrix.tf_name }} -auto-approve || { echo "terraform apply exited non-zero"; exit 1; }
+            terraform -chdir=infra/terraform apply -lock-timeout=600s -var="environment=test" -target=aws_ecs_cluster.knapsack -target=aws_ecs_task_definition.${{ matrix.tf_name }} -target=aws_ecs_service.${{ matrix.tf_name }} -auto-approve || { echo "terraform apply exited non-zero"; exit 1; }
 
             # Find latest task definition ARN for the family and update service
             FAMILY="${{ matrix.name }}-test"
@@ -294,7 +294,7 @@ jobs:
             do
               ATTEMPTS=$((ATTEMPTS+1))
               echo "Running terraform apply (attempt $ATTEMPTS/$MAX_ATTEMPTS)"
-              if terraform -chdir=infra/terraform apply -lock-timeout=300s -var="environment=test" -target=aws_ecs_task_definition.${{ matrix.tf_name }} -auto-approve; then
+              if terraform -chdir=infra/terraform apply -lock-timeout=600s -var="environment=test" -target=aws_ecs_task_definition.${{ matrix.tf_name }} -auto-approve; then
                 break
               fi
               echo "terraform apply failed (attempt $ATTEMPTS). Retrying after backoff..."
