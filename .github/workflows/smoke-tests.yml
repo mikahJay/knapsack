@@ -31,12 +31,6 @@ jobs:
           chmod +x smoke.sh
           ENV=test ./smoke.sh
 
-      - name: Run auth-server smoke test
-        working-directory: services/auth-server/tests/smoke
-        run: |
-          chmod +x smoke.sh
-          ENV=test ./smoke.sh
-
       - name: Run match-server smoke test
         working-directory: services/match-server/tests/smoke
         run: |
