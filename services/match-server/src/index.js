@@ -5,6 +5,11 @@ const { pool, initDb } = require('./db')
 
 const app = express()
 const port = process.env.PORT || 4030
+const claudeApiKey = process.env.CLAUDE_API_KEY
+
+if (!claudeApiKey) {
+  console.warn('[WARNING] CLAUDE_API_KEY not set - AI matching will not work')
+}
 
 app.use(bodyParser.json())
 
@@ -49,7 +54,7 @@ allowedOrigins.forEach(origin => {
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
   // Permit ALB health checks (no Origin header) to reach /health
-  if (req.path === '/health' || req.path === '/match/health') return next()
+  if (req.path === '/health' || req.path === '/match/health' || req.path === '/match/test-candidates') return next()
   const origin = req.headers.origin
   if (origin) {
     try {
@@ -69,19 +74,15 @@ app.use((req, res, next) => {
 // request originates from an authenticated web-app user.
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return next()
-  // Allow health checks to bypass authentication
-  if (req.path === '/health' || req.path === '/match/health') return next()
+  // Allow health checks and test route to bypass authentication
+  if (req.path === '/health' || req.path === '/match/health' || req.path === '/match/test-candidates') return next()
   return authRequired(req, res, next)
 })
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'match-server' }))
 app.get('/match/health', (req, res) => res.json({ status: 'ok', service: 'match-server' }))
 
-// Get match candidates for a specific need
-app.get('/match/needs/:needId/candidates', async (req, res) => {
-  const { needId } = req.params
-  
-  // Hardcoded random matches for now - no database query
+function buildRandomMatches(needId) {
   const resourceNames = [
     'Winter Clothing Bundle',
     'Food Supplies Package',
@@ -94,7 +95,7 @@ app.get('/match/needs/:needId/candidates', async (req, res) => {
     'Sports Equipment',
     'Tech Devices Bundle'
   ]
-  
+
   const matchReasons = [
     'Geographic proximity and similar category match',
     'High compatibility based on quantity and timing',
@@ -107,15 +108,15 @@ app.get('/match/needs/:needId/candidates', async (req, res) => {
     'Seasonal demand patterns indicate good fit',
     'Logistics efficiency and cost optimization'
   ]
-  
+
   // Generate 0-5 random matches
   const numMatches = Math.floor(Math.random() * 6)
   const matches = []
-  
+
   for (let i = 0; i < numMatches; i++) {
     const randomHoursAgo = Math.random() * 24
     const createdAt = new Date(Date.now() - randomHoursAgo * 60 * 60 * 1000)
-    
+
     matches.push({
       id: `match-${Math.random().toString(36).substr(2, 9)}`,
       need_id: needId,
@@ -123,18 +124,30 @@ app.get('/match/needs/:needId/candidates', async (req, res) => {
       resource_name: resourceNames[Math.floor(Math.random() * resourceNames.length)],
       match_reason: matchReasons[Math.floor(Math.random() * matchReasons.length)],
       match_statistics: {
-        confidence: Math.random() * 0.3 + 0.7, // 0.7 to 1.0
-        score: Math.floor(Math.random() * 30) + 70 // 70 to 100
+        confidence: Math.random() * 0.3 + 0.7,
+        score: Math.floor(Math.random() * 30) + 70
       },
       created_at: createdAt.toISOString(),
       selected: false
     })
   }
-  
+
   // Sort by created_at descending (newest first)
   matches.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  
-  res.json(matches)
+
+  return matches
+}
+
+// Temporary unauthenticated test endpoint
+app.get('/match/test-candidates', (req, res) => {
+  const needId = req.query.needId || 'test-need'
+  res.json(buildRandomMatches(needId))
+})
+
+// Get match candidates for a specific need
+app.get('/match/needs/:needId/candidates', async (req, res) => {
+  const { needId } = req.params
+  res.json(buildRandomMatches(needId))
 })
 
 // Match a need against available resources

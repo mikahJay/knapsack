@@ -30,6 +30,10 @@ resource "aws_ecs_task_definition" "match_server" {
         {
           name      = "DB_CREDENTIALS"
           valueFrom = aws_secretsmanager_secret.db_credentials.arn
+        },
+        {
+          name      = "CLAUDE_API_KEY"
+          valueFrom = aws_secretsmanager_secret.claude_api_key.arn
         }
       ]
       environment = [

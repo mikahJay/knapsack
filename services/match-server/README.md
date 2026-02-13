@@ -10,10 +10,23 @@ The match-server service handles matching public needs with public resources and
 
 ## Development
 
-```bash
-npm install
-npm start
-```
+### Setup
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Add your Claude API key to `.env`:
+   ```
+   CLAUDE_API_KEY=your_actual_api_key_here
+   ```
+
+3. Install and start:
+   ```bash
+   npm install
+   npm start
+   ```
 
 ## API
 
