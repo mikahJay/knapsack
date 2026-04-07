@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────────────────────
+# Knapsack – local development stack
+# Run:  docker compose up --build
+# ─────────────────────────────────────────────────────────────
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: knapsack
+      POSTGRES_USER: knapsack
+      POSTGRES_PASSWORD: knapsack
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./api/src/db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knapsack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      IS_PROD: "false"
+      PORT: 4000
+      DATABASE_URL: postgres://knapsack:knapsack@db:5432/knapsack
+      SESSION_SECRET: local-dev-secret-change-in-prod
+      # Google OAuth (not needed in non-prod, but define for completeness)
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      WEB_URL: http://localhost:3000
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./api/src:/app/src:ro
+
+  web:
+    build:
+      context: ./web
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      IS_PROD: "false"
+      NEXT_PUBLIC_IS_PROD: "false"
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      # Internal URL (container-to-container)
+      API_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web/src:/app/src:ro
+
+  analytics:
+    build:
+      context: ./analytics
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DBT_DB_HOST: db
+      DBT_DB_PORT: 5432
+      DBT_DB_NAME: knapsack
+      DBT_DB_USER: knapsack
+      DBT_DB_PASSWORD: knapsack
+    profiles:
+      # Only run with: docker compose --profile analytics up
+      - analytics
+
+volumes:
+  postgres-data:
