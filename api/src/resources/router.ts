@@ -2,13 +2,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { query, queryOne } from '../db';
 import { requireAuth } from '../auth/router';
 import { AppUser } from '../auth/passport';
+import type { UUID } from '../types';
 
 export interface Resource {
-  id: string;
+  id: UUID;
   title: string;
   description: string | null;
   status: string;
-  owner_id: string | null;
+  owner_id: UUID | null;
   created_at: string;
   updated_at: string;
 }
