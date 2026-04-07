@@ -9,6 +9,9 @@ export interface Need {
   title: string;
   description: string | null;
   status: string;
+  is_public: boolean;
+  quantity: number;
+  needed_by: string | null;
   owner_id: UUID | null;
   created_at: string;
   updated_at: string;
@@ -19,22 +22,29 @@ export const needsRouter = Router();
 // All routes require authentication
 needsRouter.use(requireAuth);
 
-// GET /api/needs
-needsRouter.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+// GET /api/needs — own needs plus all public needs from any user
+needsRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const needs = await query<Need>('SELECT * FROM need.needs ORDER BY created_at DESC');
+    const userId = (req.user as AppUser).id;
+    const needs = await query<Need>(
+      `SELECT * FROM need.needs
+       WHERE owner_id = $1 OR is_public = true
+       ORDER BY created_at DESC`,
+      [userId]
+    );
     res.json(needs);
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/needs/:id
+// GET /api/needs/:id — own, or public
 needsRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const userId = (req.user as AppUser).id;
     const need = await queryOne<Need>(
-      'SELECT * FROM need.needs WHERE id = $1',
-      [req.params['id']]
+      `SELECT * FROM need.needs WHERE id = $1 AND (owner_id = $2 OR is_public = true)`,
+      [req.params['id'], userId]
     );
     if (!need) return res.status(404).json({ error: 'Not found' });
     res.json(need);
@@ -46,15 +56,24 @@ needsRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) 
 // POST /api/needs
 needsRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, description } = req.body as { title?: string; description?: string };
+    const { title, description, is_public, quantity, needed_by } = req.body as {
+      title?: string;
+      description?: string;
+      is_public?: boolean;
+      quantity?: number;
+      needed_by?: string | null;
+    };
     if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
+    if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
+      return res.status(400).json({ error: 'quantity must be a positive integer' });
+    }
 
     const ownerId = (req.user as AppUser).id;
     const need = await queryOne<Need>(
-      `INSERT INTO need.needs (title, description, owner_id)
-       VALUES ($1, $2, $3)
+      `INSERT INTO need.needs (title, description, is_public, quantity, needed_by, owner_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [title.trim(), description ?? null, ownerId]
+      [title.trim(), description ?? null, is_public ?? false, quantity ?? 1, needed_by ?? null, ownerId]
     );
     res.status(201).json(need);
   } catch (err) {
@@ -62,30 +81,40 @@ needsRouter.post('/', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-// PUT /api/needs/:id
+// PUT /api/needs/:id — owner only
 needsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, description, status } = req.body as {
+    const { title, description, status, is_public, quantity, needed_by } = req.body as {
       title?: string;
       description?: string;
       status?: string;
+      is_public?: boolean;
+      quantity?: number;
+      needed_by?: string | null;
     };
+    if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
+      return res.status(400).json({ error: 'quantity must be a positive integer' });
+    }
 
+    const userId = (req.user as AppUser).id;
     const existing = await queryOne<Need>(
-      'SELECT * FROM need.needs WHERE id = $1',
-      [req.params['id']]
+      'SELECT * FROM need.needs WHERE id = $1 AND owner_id = $2',
+      [req.params['id'], userId]
     );
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const need = await queryOne<Need>(
       `UPDATE need.needs
-       SET title = $1, description = $2, status = $3
-       WHERE id = $4
+       SET title = $1, description = $2, status = $3, is_public = $4, quantity = $5, needed_by = $6
+       WHERE id = $7
        RETURNING *`,
       [
         title?.trim() ?? existing.title,
         description !== undefined ? description : existing.description,
         status ?? existing.status,
+        is_public !== undefined ? is_public : existing.is_public,
+        quantity ?? existing.quantity,
+        needed_by !== undefined ? needed_by : existing.needed_by,
         req.params['id'],
       ]
     );
@@ -95,12 +124,13 @@ needsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// DELETE /api/needs/:id
+// DELETE /api/needs/:id — owner only
 needsRouter.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const userId = (req.user as AppUser).id;
     const result = await query<{ id: string }>(
-      'DELETE FROM need.needs WHERE id = $1 RETURNING id',
-      [req.params['id']]
+      'DELETE FROM need.needs WHERE id = $1 AND owner_id = $2 RETURNING id',
+      [req.params['id'], userId]
     );
     if (result.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true });

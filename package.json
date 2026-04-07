@@ -1,0 +1,24 @@
+{
+  "name": "knapsack",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"api,web\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix api\" \"npm run dev --prefix web\"",
+    "dev:api": "npm run dev --prefix api",
+    "dev:web": "npm run dev --prefix web",
+    "build": "npm run build --prefix api && npm run build --prefix web",
+    "test": "npm run test --prefix api && npm run test --prefix web",
+    "docker:up": "docker compose up --build",
+    "docker:up:detached": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:down:volumes": "docker compose down -v",
+    "docker:logs": "docker compose logs -f",
+    "docker:logs:api": "docker compose logs -f api",
+    "docker:logs:web": "docker compose logs -f web",
+    "docker:ps": "docker compose ps",
+    "docker:analytics": "docker compose --profile analytics up --build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

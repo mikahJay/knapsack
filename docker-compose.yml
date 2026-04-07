@@ -57,6 +57,9 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:4000
       # Internal URL (container-to-container)
       API_URL: http://api:4000
+      # Force polling so file-change events reach Next.js inside Docker on
+      # Windows / macOS where host FS events are not forwarded to containers.
+      WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"
     volumes:

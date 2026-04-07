@@ -16,9 +16,10 @@ jest.mock('connect-pg-simple', () => {
   };
 });
 
-import { query as _query, queryOne as _queryOne } from './db';
+import { query as _query, queryOne as _queryOne, pool as _pool } from './db';
 const mockQuery = _query as jest.Mock;
 const mockQueryOne = _queryOne as jest.Mock;
+const mockPool = _pool as unknown as { query: jest.Mock };
 
 const BOB = { id: 'bob-uuid', email: 'bob@local.dev', name: 'Bob', provider: 'local' };
 
@@ -173,5 +174,41 @@ describe('Resources CRUD — authenticated', () => {
   it('POST /api/resources returns 400 when title is missing', async () => {
     const res = await agent.post('/api/resources').send({});
     expect(res.status).toBe(400);
+  });
+});
+
+// ── Health checks ─────────────────────────────────────────────
+describe('Health checks', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('GET /health returns shallow health fields', async () => {
+    const res = await request(createApp()).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.isProd).toBe(false);
+    expect(typeof res.body.uptime).toBe('number');
+    expect(typeof res.body.timestamp).toBe('string');
+  });
+
+  it('GET /health/deep returns 200 and db.ok when DB is reachable', async () => {
+    mockPool.query.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
+
+    const res = await request(createApp()).get('/health/deep');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.checks.db.ok).toBe(true);
+    expect(typeof res.body.checks.db.latencyMs).toBe('number');
+    expect(res.body.checks.db.error).toBeUndefined();
+  });
+
+  it('GET /health/deep returns 503 and db error when DB is unreachable', async () => {
+    mockPool.query.mockRejectedValueOnce(new Error('connection refused'));
+
+    const res = await request(createApp()).get('/health/deep');
+    expect(res.status).toBe(503);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.checks.db.ok).toBe(false);
+    expect(res.body.checks.db.error).toBe('connection refused');
+    expect(res.body.checks.db.latencyMs).toBeUndefined();
   });
 });

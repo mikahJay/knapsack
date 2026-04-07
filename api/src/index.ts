@@ -55,9 +55,46 @@ export function createApp(): express.Application {
   app.use('/api/needs', needsRouter);
   app.use('/api/resources', resourcesRouter);
 
-  // ── Health check ────────────────────────────────────────────
+  // ── Health checks ────────────────────────────────────────────
+  // Shallow — always fast, no external dependencies
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ ok: true, isProd: config.isProd });
+    res.json({
+      ok: true,
+      isProd: config.isProd,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Deep — verifies database connectivity
+  app.get('/health/deep', async (_req: Request, res: Response) => {
+    const start = Date.now();
+    let dbOk = false;
+    let dbLatencyMs: number | undefined;
+    let dbError: string | undefined;
+
+    try {
+      await pool.query('SELECT 1');
+      dbLatencyMs = Date.now() - start;
+      dbOk = true;
+    } catch (err) {
+      dbError = err instanceof Error ? err.message : String(err);
+    }
+
+    const ok = dbOk;
+    res.status(ok ? 200 : 503).json({
+      ok,
+      isProd: config.isProd,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      checks: {
+        db: {
+          ok: dbOk,
+          ...(dbLatencyMs !== undefined && { latencyMs: dbLatencyMs }),
+          ...(dbError !== undefined && { error: dbError }),
+        },
+      },
+    });
   });
 
   // ── Error handler ───────────────────────────────────────────

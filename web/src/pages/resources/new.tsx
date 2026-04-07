@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
-import { createNeed } from '../../lib/api';
+import { createResource } from '../../lib/api';
 
-export default function NewNeedPage() {
+export default function NewResourcePage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [neededBy, setNeededBy] = useState('');
+  const [availableUntil, setAvailableUntil] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -19,14 +19,14 @@ export default function NewNeedPage() {
     setSaving(true);
     setError(null);
     try {
-      await createNeed({
+      await createResource({
         title: title.trim(),
         description: description.trim() || undefined,
         quantity,
-        needed_by: neededBy || undefined,
+        available_until: availableUntil || undefined,
         is_public: isPublic,
       });
-      router.push('/needs');
+      router.push('/resources');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -37,7 +37,7 @@ export default function NewNeedPage() {
   return (
     <Layout>
       <div className="max-w-lg">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">New Need</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">New Resource</h1>
         {error && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</div>
         )}
@@ -72,11 +72,11 @@ export default function NewNeedPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Needed by</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Available until</label>
               <input
                 type="date"
-                value={neededBy}
-                onChange={(e) => setNeededBy(e.target.value)}
+                value={availableUntil}
+                onChange={(e) => setAvailableUntil(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
@@ -103,7 +103,7 @@ export default function NewNeedPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/needs')}
+              onClick={() => router.push('/resources')}
               className="text-sm font-medium text-gray-500 hover:text-gray-700"
             >
               Cancel

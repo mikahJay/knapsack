@@ -21,6 +21,9 @@ export interface Need {
   title: string;
   description: string | null;
   status: string;
+  is_public: boolean;
+  quantity: number;
+  needed_by: string | null;
   owner_id: UUID | null;
   created_at: string;
   updated_at: string;
@@ -31,6 +34,9 @@ export interface Resource {
   title: string;
   description: string | null;
   status: string;
+  is_public: boolean;
+  quantity: number;
+  available_until: string | null;
   owner_id: UUID | null;
   created_at: string;
   updated_at: string;
@@ -60,11 +66,11 @@ export const logout = () => apiFetch<{ ok: boolean }>('/auth/logout', { method: 
 // ── Needs ─────────────────────────────────────────────────────
 export const listNeeds = () => apiFetch<Need[]>('/api/needs');
 export const getOnNeed = (id: string) => apiFetch<Need>(`/api/needs/${id}`);
-export const createNeed = (body: { title: string; description?: string }) =>
+export const createNeed = (body: { title: string; description?: string; is_public?: boolean; quantity?: number; needed_by?: string }) =>
   apiFetch<Need>('/api/needs', { method: 'POST', body: JSON.stringify(body) });
 export const updateNeed = (
   id: string,
-  body: { title?: string; description?: string; status?: string }
+  body: { title?: string; description?: string; status?: string; is_public?: boolean; quantity?: number; needed_by?: string | null }
 ) => apiFetch<Need>(`/api/needs/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteNeed = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/needs/${id}`, { method: 'DELETE' });
@@ -72,11 +78,11 @@ export const deleteNeed = (id: string) =>
 // ── Resources ─────────────────────────────────────────────────
 export const listResources = () => apiFetch<Resource[]>('/api/resources');
 export const getOneResource = (id: string) => apiFetch<Resource>(`/api/resources/${id}`);
-export const createResource = (body: { title: string; description?: string }) =>
+export const createResource = (body: { title: string; description?: string; is_public?: boolean; quantity?: number; available_until?: string }) =>
   apiFetch<Resource>('/api/resources', { method: 'POST', body: JSON.stringify(body) });
 export const updateResource = (
   id: string,
-  body: { title?: string; description?: string; status?: string }
+  body: { title?: string; description?: string; status?: string; is_public?: boolean; quantity?: number; available_until?: string | null }
 ) => apiFetch<Resource>(`/api/resources/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteResource = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' });
