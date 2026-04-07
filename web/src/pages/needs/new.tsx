@@ -8,7 +8,7 @@ export default function NewNeedPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [neededBy, setNeededBy] = useState('');
+  const [neededBy, setNeededBy] = useState(() => new Date().toISOString().slice(0, 10));
   const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,8 +43,9 @@ export default function NewNeedPage() {
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
+              id="title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -52,8 +53,9 @@ export default function NewNeedPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
+              id="description"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -62,8 +64,9 @@ export default function NewNeedPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+              <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
               <input
+                id="quantity"
                 type="number"
                 min={1}
                 value={quantity}
@@ -72,8 +75,9 @@ export default function NewNeedPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Needed by</label>
+              <label htmlFor="needed_by" className="block text-sm font-medium text-gray-700 mb-1">Needed by</label>
               <input
+                id="needed_by"
                 type="date"
                 value={neededBy}
                 onChange={(e) => setNeededBy(e.target.value)}

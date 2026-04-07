@@ -38,6 +38,34 @@ resourcesRouter.get('/', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
+// GET /api/resources/search?q=<query> — top 5 public+own resources by closest title match
+resourcesRouter.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = ((req.query['q'] as string) ?? '').trim();
+    if (!q) return res.json([]);
+    const userId = (req.user as AppUser).id;
+    const resources = await query<Resource>(
+      `SELECT * FROM resource.resources
+       WHERE (owner_id = $1 OR is_public = true)
+         AND (title ILIKE '%' || $2 || '%' OR description ILIKE '%' || $2 || '%')
+       ORDER BY
+         CASE
+           WHEN LOWER(title) = LOWER($2)           THEN 0
+           WHEN LOWER(title) LIKE LOWER($2) || '%' THEN 1
+           WHEN LOWER(title) LIKE '%' || LOWER($2) THEN 2
+           ELSE 3
+         END,
+         LENGTH(title),
+         title
+       LIMIT 5`,
+      [userId, q]
+    );
+    res.json(resources);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/resources/:id — own, or public
 resourcesRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

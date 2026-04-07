@@ -8,7 +8,11 @@ export default function NewResourcePage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [availableUntil, setAvailableUntil] = useState('');
+  const [availableUntil, setAvailableUntil] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
   const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,8 +47,9 @@ export default function NewResourcePage() {
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
+              id="title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -52,8 +57,9 @@ export default function NewResourcePage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
+              id="description"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -62,8 +68,9 @@ export default function NewResourcePage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+              <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
               <input
+                id="quantity"
                 type="number"
                 min={1}
                 value={quantity}
@@ -72,8 +79,9 @@ export default function NewResourcePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Available until</label>
+              <label htmlFor="available_until" className="block text-sm font-medium text-gray-700 mb-1">Available until</label>
               <input
+                id="available_until"
                 type="date"
                 value={availableUntil}
                 onChange={(e) => setAvailableUntil(e.target.value)}

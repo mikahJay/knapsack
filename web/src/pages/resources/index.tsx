@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { listResources, deleteResource, Resource } from '../../lib/api';
+import { listResources, deleteResource, Resource, searchResources, getMe } from '../../lib/api';
 
 const STATUS_COLOURS: Record<string, string> = {
   available: 'bg-green-100 text-green-700',
@@ -21,10 +21,34 @@ function isPast(iso: string | null): boolean {
 export default function ResourcesPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Resource[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     listResources().then(setResources).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    getMe().then((u) => setCurrentUserId(u.id)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const alphaCount = (query.match(/[a-zA-Z]/g) ?? []).length;
+    if (alphaCount < 5) { setSearchResults(null); return; }
+    const timer: ReturnType<typeof setTimeout> = setTimeout(async () => {
+      setSearching(true);
+      try {
+        setSearchResults(await searchResources(query));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this resource?')) return;
@@ -32,9 +56,12 @@ export default function ResourcesPage() {
     setResources((prev) => prev.filter((r) => r.id !== id));
   }
 
+  const alphaCount = (query.match(/[a-zA-Z]/g) ?? []).length;
+  const remaining = Math.max(0, 5 - alphaCount);
+
   return (
     <Layout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-800">Resources</h1>
         <Link
           href="/resources/new"
@@ -44,7 +71,64 @@ export default function ResourcesPage() {
         </Link>
       </div>
 
-      {loading ? (
+      <div className="mb-6">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search public resources… (type 5+ letters)"
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        {query.length > 0 && remaining > 0 && (
+          <p className="text-xs text-gray-400 mt-1">
+            {remaining} more letter{remaining !== 1 ? 's' : ''} needed to search
+          </p>
+        )}
+      </div>
+
+      {searchResults !== null ? (
+        <>
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            {searching ? 'Searching…' : `Search results (${searchResults.length})`}
+          </p>
+          {!searching && searchResults.length === 0 ? (
+            <p className="text-gray-400 text-sm">No matches found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {searchResults.map((resource) => (
+                <li key={resource.id}>
+                  <Link
+                    href={`/resources/${resource.id}`}
+                    className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border border-gray-100 hover:border-indigo-300 hover:shadow transition"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800">
+                        {resource.title}
+                        {currentUserId && resource.owner_id === currentUserId && (
+                          <span className="ml-1.5 text-xs font-normal text-indigo-500">(mine)</span>
+                        )}
+                      </p>
+                      {resource.description && (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{resource.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                      {resource.quantity > 1 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
+                          ×{resource.quantity}
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLOURS[resource.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {resource.status}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : loading ? (
         <p className="text-gray-400">Loading…</p>
       ) : resources.length === 0 ? (
         <p className="text-gray-400">No resources yet. Create one!</p>

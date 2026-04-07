@@ -74,6 +74,8 @@ export const updateNeed = (
 ) => apiFetch<Need>(`/api/needs/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteNeed = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/needs/${id}`, { method: 'DELETE' });
+export const searchNeeds = (q: string) =>
+  apiFetch<Need[]>(`/api/needs/search?q=${encodeURIComponent(q)}`);
 
 // ── Resources ─────────────────────────────────────────────────
 export const listResources = () => apiFetch<Resource[]>('/api/resources');
@@ -86,3 +88,5 @@ export const updateResource = (
 ) => apiFetch<Resource>(`/api/resources/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteResource = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' });
+export const searchResources = (q: string) =>
+  apiFetch<Resource[]>(`/api/resources/search?q=${encodeURIComponent(q)}`);
