@@ -1,0 +1,20 @@
+{
+  "name": "knapsack-test-data",
+  "version": "0.1.0",
+  "description": "Scripts for seeding and cleaning up test data in the Knapsack database",
+  "private": true,
+  "scripts": {
+    "generate": "ts-node src/generate.ts",
+    "delete": "ts-node src/delete.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
