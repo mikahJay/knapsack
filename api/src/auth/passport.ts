@@ -38,8 +38,8 @@ export async function upsertBypassUser(): Promise<AppUser> {
   if (existing) return existing;
 
   const [created] = await query<AppUser>(
-    `INSERT INTO auth.users (email, name, provider)
-     VALUES ($1, $2, $3)
+    `INSERT INTO auth.users (email, name, provider, is_admin)
+     VALUES ($1, $2, $3, true)
      RETURNING id, email, name, provider, is_admin`,
     ['bob@local.dev', 'Bob', 'local']
   );

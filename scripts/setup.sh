@@ -39,6 +39,9 @@ npm install --prefix "$ROOT_DIR/api" --silent
 info "Installing web dependencies…"
 npm install --prefix "$ROOT_DIR/web" --silent
 
+info "Installing matcher dependencies…"
+npm install --prefix "$ROOT_DIR/matcher" --silent
+
 success "All dependencies installed."
 
 # ── Environment file ──────────────────────────────────────────

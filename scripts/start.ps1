@@ -25,7 +25,7 @@ if (-not (Test-Path "$RootDir\node_modules")) {
     & "$PSScriptRoot\setup.ps1"
 }
 
-if (-not (Test-Path "$RootDir\api\node_modules") -or -not (Test-Path "$RootDir\web\node_modules")) {
+if (-not (Test-Path "$RootDir\api\node_modules") -or -not (Test-Path "$RootDir\web\node_modules") -or -not (Test-Path "$RootDir\matcher\node_modules")) {
     Write-Warn "Service node_modules missing. Running setup first..."
     & "$PSScriptRoot\setup.ps1"
 }
@@ -42,9 +42,10 @@ if ($Docker) {
     }
 
     Write-Host "`nStarting Knapsack via Docker Compose...`n" -ForegroundColor White
-    Write-Info "API  ->  http://localhost:4000"
-    Write-Info "Web  ->  http://localhost:3000"
-    Write-Info "DB   ->  localhost:5432"
+    Write-Info "API      ->  http://localhost:4000"
+    Write-Info "Matcher  ->  http://localhost:5000"
+    Write-Info "Web      ->  http://localhost:3000"
+    Write-Info "DB       ->  localhost:5432"
     Write-Host ""
 
     Set-Location $RootDir
@@ -55,8 +56,9 @@ if ($Docker) {
     }
 
     Write-Host "`nStarting Knapsack in local dev mode...`n" -ForegroundColor White
-    Write-Info "API  ->  http://localhost:4000  (ts-node-dev, hot-reload)"
-    Write-Info "Web  ->  http://localhost:3000  (Next.js dev server)"
+    Write-Info "API      ->  http://localhost:4000  (ts-node-dev, hot-reload)"
+    Write-Info "Matcher  ->  http://localhost:5000  (ts-node-dev, hot-reload)"
+    Write-Info "Web      ->  http://localhost:3000  (Next.js dev server)"
     Write-Warn "Requires a running Postgres instance on localhost:5432."
     Write-Warn "If you don't have one, use:  .\scripts\start.ps1 -Docker"
     Write-Host ""

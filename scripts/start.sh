@@ -29,7 +29,7 @@ if [[ ! -d "$ROOT_DIR/node_modules" ]]; then
   bash "$ROOT_DIR/scripts/setup.sh"
 fi
 
-if [[ ! -d "$ROOT_DIR/api/node_modules" || ! -d "$ROOT_DIR/web/node_modules" ]]; then
+if [[ ! -d "$ROOT_DIR/api/node_modules" || ! -d "$ROOT_DIR/web/node_modules" || ! -d "$ROOT_DIR/matcher/node_modules" ]]; then
   warn "Service node_modules missing. Running setup first…"
   bash "$ROOT_DIR/scripts/setup.sh"
 fi
@@ -44,9 +44,10 @@ if $USE_DOCKER; then
   command -v docker >/dev/null 2>&1 || error "Docker not found. Install Docker Desktop from https://docker.com"
 
   echo -e "\n${BOLD}Starting Knapsack via Docker Compose…${RESET}\n"
-  info "API  →  http://localhost:4000"
-  info "Web  →  http://localhost:3000"
-  info "DB   →  localhost:5432"
+  info "API      →  http://localhost:4000"
+  info "Matcher  →  http://localhost:5000"
+  info "Web      →  http://localhost:3000"
+  info "DB       →  localhost:5432"
   echo ""
   cd "$ROOT_DIR"
   docker compose up --build
@@ -54,8 +55,9 @@ else
   command -v node >/dev/null 2>&1 || error "Node.js not found. Install it from https://nodejs.org"
 
   echo -e "\n${BOLD}Starting Knapsack in local dev mode…${RESET}\n"
-  info "API  →  http://localhost:4000  (ts-node-dev, hot-reload)"
-  info "Web  →  http://localhost:3000  (Next.js dev server)"
+  info "API      →  http://localhost:4000  (ts-node-dev, hot-reload)"
+  info "Matcher  →  http://localhost:5000  (ts-node-dev, hot-reload)"
+  info "Web      →  http://localhost:3000  (Next.js dev server)"
   warn "Requires a running Postgres instance on localhost:5432."
   warn "If you don't have one, use:  bash scripts/start.sh --docker"
   echo ""

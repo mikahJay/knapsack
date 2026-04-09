@@ -38,6 +38,9 @@ npm install --prefix "$RootDir\api" --silent
 Write-Info "Installing web dependencies..."
 npm install --prefix "$RootDir\web" --silent
 
+Write-Info "Installing matcher dependencies..."
+npm install --prefix "$RootDir\matcher" --silent
+
 Write-Success "All dependencies installed."
 
 # ── Environment file ──────────────────────────────────────────

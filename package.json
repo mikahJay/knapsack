@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --names \"api,web\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix api\" \"npm run dev --prefix web\"",
+    "dev": "concurrently --names \"api,matcher,web\" --prefix-colors \"cyan,yellow,magenta\" \"npm run dev --prefix api\" \"npm run dev --prefix matcher\" \"npm run dev --prefix web\"",
     "dev:api": "npm run dev --prefix api",
+    "dev:matcher": "npm run dev --prefix matcher",
     "dev:web": "npm run dev --prefix web",
-    "build": "npm run build --prefix api && npm run build --prefix web",
+    "build": "npm run build --prefix api && npm run build --prefix matcher && npm run build --prefix web",
     "test": "npm run test --prefix api && npm run test --prefix web",
     "docker:up": "docker compose up --build",
     "docker:up:detached": "docker compose up --build -d",
