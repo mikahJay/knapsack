@@ -1,8 +1,20 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { config } from '../config';
-import { passport, upsertBypassUser } from './passport';
+import { passport, upsertBypassUser, AppUser } from './passport';
 
 export const authRouter = Router();
+
+// ── requireAuth middleware ─────────────────────────────────────
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  if (req.isAuthenticated()) return next();
+  res.status(401).json({ error: 'Not authenticated' });
+}
+
+// ── requireAdmin middleware ────────────────────────────────────
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (req.isAuthenticated() && (req.user as AppUser).is_admin) return next();
+  res.status(403).json({ error: 'Forbidden' });
+}
 
 // ── GET /auth/me — return current user (or 401) ───────────────
 authRouter.get('/me', (req: Request, res: Response) => {
@@ -52,8 +64,4 @@ authRouter.post('/logout', (req: Request, res: Response, next: NextFunction) => 
   });
 });
 
-/** Express middleware: require an authenticated session. */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  if (req.isAuthenticated()) return next();
-  res.status(401).json({ error: 'Not authenticated' });
-}
+

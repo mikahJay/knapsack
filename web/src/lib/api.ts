@@ -14,6 +14,7 @@ export interface User {
   email: string;
   name: string | null;
   provider: string;
+  is_admin: boolean;
 }
 
 export interface Need {
@@ -90,3 +91,23 @@ export const deleteResource = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' });
 export const searchResources = (q: string) =>
   apiFetch<Resource[]>(`/api/resources/search?q=${encodeURIComponent(q)}`);
+
+// ── Admin ─────────────────────────────────────────────────────
+export interface RematchStats {
+  ok: boolean;
+  strategy: string;
+  needsScanned: number;
+  resourcesScanned: number;
+  matchesUpserted: number;
+  durationMs: number;
+  error?: string;
+}
+
+export const triggerFullRematch = () =>
+  apiFetch<RematchStats>('/admin/rematch/full', { method: 'POST' });
+
+export const triggerPartialRematch = (since?: string) =>
+  apiFetch<RematchStats>('/admin/rematch/partial', {
+    method: 'POST',
+    body: JSON.stringify(since ? { since } : {}),
+  });

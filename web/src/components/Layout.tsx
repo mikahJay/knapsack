@@ -40,6 +40,11 @@ export default function Layout({ children }: LayoutProps) {
             <Link href="/resources" className="hover:text-indigo-600">
               Resources
             </Link>
+            {user.is_admin && (
+              <Link href="/admin" className="hover:text-indigo-600">
+                Admin
+              </Link>
+            )}
             <span className="text-gray-400">|</span>
             <span>{user.name ?? user.email}</span>
             <button
