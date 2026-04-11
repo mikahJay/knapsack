@@ -180,8 +180,11 @@ The `Dockerfile` defines three stages:
 | Stage | Used by | Description |
 |---|---|---|
 | `base` | Build dependency | Installs npm dependencies |
-| `dev` | `docker compose up` | Runs `ts-node-dev` with source mounted as a volume |
+| `dev` | Local Docker experimentation | Runs `ts-node-dev` |
 | `production` | Prod deploys | Compiled JS only, no dev dependencies |
+
+The repository Docker Compose stack uses the `production` stage in non-prod mode for
+runtime stability on Windows/Docker Desktop. Use local dev scripts when you need hot reload.
 
 Build the production image directly:
 

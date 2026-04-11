@@ -47,6 +47,9 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ### Option A — Docker (recommended, no local Postgres needed)
 
+This stack runs stable built application processes in non-prod mode. For hot reload,
+use local dev mode instead of Docker.
+
 ```bash
 # Unix / macOS / Linux
 bash scripts/setup.sh
@@ -126,6 +129,9 @@ See [`.env.example`](.env.example) for all available variables.
 | `npm run docker:logs:web` | Tail web logs only |
 | `npm run docker:ps` | Show running container status |
 | `npm run docker:analytics` | Start stack with the analytics profile |
+
+The Docker stack keeps `IS_PROD=false` but runs built runtime images rather than
+watcher-based dev servers. This is more stable on Windows hosts using Docker Desktop.
 
 ---
 
