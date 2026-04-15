@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
-import { listMatches, Match } from '../../lib/api';
+import { listMatches, markMatchesSeen, Match } from '../../lib/api';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -22,6 +22,7 @@ export default function MatchesPage() {
   const router = useRouter();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newlySeenIds, setNewlySeenIds] = useState<string[]>([]);
 
   const needId = typeof router.query['needId'] === 'string' ? router.query['needId'] : undefined;
   const resourceId = typeof router.query['resourceId'] === 'string' ? router.query['resourceId'] : undefined;
@@ -29,7 +30,20 @@ export default function MatchesPage() {
   useEffect(() => {
     setLoading(true);
     listMatches({ needId, resourceId })
-      .then(setMatches)
+      .then((fetched) => {
+        setMatches(fetched);
+
+        const unseenIds = fetched.filter((match) => !match.seen_at).map((match) => match.id);
+        setNewlySeenIds(unseenIds);
+
+        if (unseenIds.length > 0) {
+          void markMatchesSeen(unseenIds)
+            .then(() => {
+              window.dispatchEvent(new Event('matches:refresh-unseen'));
+            })
+            .catch(() => {});
+        }
+      })
       .finally(() => setLoading(false));
   }, [needId, resourceId]);
 
@@ -69,11 +83,12 @@ export default function MatchesPage() {
       ) : (
         <ul className="space-y-4">
           {matches.map((match) => {
-            const highlightClasses = isFiltered
-              ? 'border-2 border-green-300 bg-green-50'
+            const isFirstSeen = newlySeenIds.includes(match.id);
+            const highlightClasses = isFirstSeen
+              ? 'border-4 border-green-500 bg-green-50'
               : 'border border-gray-100 bg-white';
-            const textClasses = isFiltered ? 'text-green-700' : 'text-gray-800';
-            const mutedClasses = isFiltered ? 'text-green-700' : 'text-gray-500';
+            const textClasses = isFirstSeen ? 'text-green-700' : 'text-gray-800';
+            const mutedClasses = isFirstSeen ? 'text-green-700' : 'text-gray-500';
 
             return (
               <li
@@ -83,6 +98,11 @@ export default function MatchesPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {isFirstSeen && (
+                        <span className="text-xs font-extrabold uppercase tracking-[0.2em] text-green-700">
+                          New
+                        </span>
+                      )}
                       <span className={`text-xs font-bold uppercase tracking-[0.2em] ${mutedClasses}`}>
                         Matched pair
                       </span>
@@ -119,11 +139,11 @@ export default function MatchesPage() {
                       </div>
                     </div>
                     {match.rationale && (
-                      <p className={`mt-4 text-sm ${textClasses}`}>{match.rationale}</p>
+                      <p className={`mt-4 text-sm font-semibold ${textClasses}`}>{match.rationale}</p>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className={`text-sm font-semibold ${textClasses}`}>Score {formatScore(match.score)}</p>
+                    <p className={`text-sm font-bold ${textClasses}`}>Score {formatScore(match.score)}</p>
                     <p className={`text-xs mt-1 ${mutedClasses}`}>via {match.strategy}</p>
                   </div>
                 </div>

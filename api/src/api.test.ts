@@ -19,7 +19,7 @@ jest.mock('connect-pg-simple', () => {
 import { query as _query, queryOne as _queryOne, pool as _pool } from './db';
 const mockQuery = _query as jest.Mock;
 const mockQueryOne = _queryOne as jest.Mock;
-const mockPool = _pool as unknown as { query: jest.Mock };
+const mockPool = _pool as unknown as { query: jest.Mock; connect: jest.Mock };
 
 const BOB = { id: 'bob-uuid', email: 'bob@local.dev', name: 'Bob', provider: 'local' };
 
@@ -128,6 +128,41 @@ describe('Needs CRUD — authenticated', () => {
     const res = await agent.delete('/api/needs/nonexistent-id');
     expect(res.status).toBe(404);
   });
+
+  it('PUT /api/needs/:id creates a new immutable version', async () => {
+    const existingNeed = {
+      id: 'n1',
+      title: 'Old Need',
+      description: 'old',
+      status: 'open',
+      is_public: false,
+      quantity: 1,
+      needed_by: null,
+      owner_id: BOB.id,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+    const nextNeed = { ...existingNeed, id: 'n2', title: 'Updated Need' };
+
+    mockQueryOne.mockResolvedValueOnce(BOB).mockResolvedValueOnce(existingNeed);
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [nextNeed] })
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({}),
+      release: jest.fn(),
+    };
+    mockPool.connect.mockResolvedValueOnce(client);
+
+    const res = await agent.put('/api/needs/n1').send({ title: 'Updated Need' });
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe('n2');
+    expect(client.query).toHaveBeenCalledWith('BEGIN');
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalled();
+  });
 });
 
 // ── Resources CRUD ────────────────────────────────────────────
@@ -168,6 +203,7 @@ describe('Matches — authenticated', () => {
         resource_title: 'Resource Alpha',
         resource_status: 'available',
         resource_owner_id: 'other-uuid',
+        seen_at: null,
       },
     ];
     mockQuery.mockResolvedValueOnce(matches);
@@ -175,6 +211,29 @@ describe('Matches — authenticated', () => {
     const res = await agent.get('/api/matches');
     expect(res.status).toBe(200);
     expect(res.body).toEqual(matches);
+  });
+
+  it('GET /api/matches/unseen-count returns count payload', async () => {
+    mockQuery.mockResolvedValueOnce([{ count: '2' }]);
+
+    const res = await agent.get('/api/matches/unseen-count');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ count: 2 });
+  });
+
+  it('POST /api/matches/seen marks matches as seen', async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ id: 'm1' }])
+      .mockResolvedValueOnce([]);
+
+    const res = await agent.post('/api/matches/seen').send({ matchIds: ['m1'] });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, marked: 1 });
+  });
+
+  it('POST /api/matches/seen returns 400 for non-array payload', async () => {
+    const res = await agent.post('/api/matches/seen').send({ matchIds: 'm1' });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -210,6 +269,41 @@ describe('Resources CRUD — authenticated', () => {
   it('POST /api/resources returns 400 when title is missing', async () => {
     const res = await agent.post('/api/resources').send({});
     expect(res.status).toBe(400);
+  });
+
+  it('PUT /api/resources/:id creates a new immutable version', async () => {
+    const existingResource = {
+      id: 'r1',
+      title: 'Old Resource',
+      description: 'old',
+      status: 'available',
+      is_public: false,
+      quantity: 1,
+      available_until: null,
+      owner_id: BOB.id,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+    const nextResource = { ...existingResource, id: 'r2', title: 'Updated Resource' };
+
+    mockQueryOne.mockResolvedValueOnce(BOB).mockResolvedValueOnce(existingResource);
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [nextResource] })
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({}),
+      release: jest.fn(),
+    };
+    mockPool.connect.mockResolvedValueOnce(client);
+
+    const res = await agent.put('/api/resources/r1').send({ title: 'Updated Resource' });
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe('r2');
+    expect(client.query).toHaveBeenCalledWith('BEGIN');
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalled();
   });
 });
 

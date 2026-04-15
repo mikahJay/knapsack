@@ -21,10 +21,11 @@ npx ts-node src/generate.ts [env] [options]
 | Argument | Default | Description |
 |---|---|---|
 | `env` (positional) | `non-prod` | Pass `prod` to run in production mode (bob is excluded as an owner) |
-| `--needs N` | `10` | Number of needs to create (0 – 100) |
-| `--resources N` | `10` | Number of resources to create (0 – 100) |
+| `--needs N` | `10` | Number of needs to create (0 – 1000) |
+| `--resources N` | `10` | Number of resources to create (0 – 1000) |
 | `--owners N` | `5` | Number of distinct owners to assign items to (1 – 10), drawn from a pool of 100 persistent test users |
 | `--bob-pct N` | `20` | Percentage of items owned by `bob@local.dev` (0 – 100). Ignored in `prod` mode. |
+| `--public-pct N` | `100` | Percentage of items marked public (`is_public = true`) (0 – 100). |
 
 **Examples:**
 
@@ -34,6 +35,9 @@ npm run generate
 
 # 50 needs, 30 resources, 8 distinct owners, 40% owned by bob
 npm run generate -- non-prod --needs 50 --resources 30 --owners 8 --bob-pct 40
+
+# 1000 needs/resources with 90% public visibility
+npm run generate -- non-prod --needs 1000 --resources 1000 --public-pct 90
 
 # Prod mode — bob is not used as an owner
 npm run generate -- prod --needs 20 --resources 20 --owners 3

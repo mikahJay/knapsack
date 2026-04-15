@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ReactNode, useEffect, useState } from 'react';
-import { getMe, listMatches, logout, User } from '../lib/api';
+import { getMe, getUnseenMatchesCount, logout, User } from '../lib/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,18 +12,31 @@ export default function Layout({ children }: LayoutProps) {
   const [user, setUser] = useState<User | null>(null);
   const [matchCount, setMatchCount] = useState(0);
 
+  async function refreshUnseenCount() {
+    try {
+      const payload = await getUnseenMatchesCount();
+      setMatchCount(payload.count);
+    } catch {
+      setMatchCount(0);
+    }
+  }
+
   useEffect(() => {
+    const handleRefresh = () => {
+      void refreshUnseenCount();
+    };
+
     getMe()
       .then(async (currentUser) => {
         setUser(currentUser);
-        try {
-          const matches = await listMatches();
-          setMatchCount(matches.length);
-        } catch {
-          setMatchCount(0);
-        }
+        await refreshUnseenCount();
       })
       .catch(() => router.push('/login'));
+
+    window.addEventListener('matches:refresh-unseen', handleRefresh);
+    return () => {
+      window.removeEventListener('matches:refresh-unseen', handleRefresh);
+    };
   }, [router]);
 
   async function handleLogout() {

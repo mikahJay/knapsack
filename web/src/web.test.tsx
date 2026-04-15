@@ -40,12 +40,16 @@ const mockDeleteNeed = jest.fn();
 const mockSearchNeeds = jest.fn();
 const mockCreateNeed = jest.fn();
 const mockGetOnNeed = jest.fn();
+const mockUpdateNeed = jest.fn();
 const mockListResources = jest.fn();
 const mockDeleteResource = jest.fn();
 const mockSearchResources = jest.fn();
 const mockCreateResource = jest.fn();
 const mockGetOneResource = jest.fn();
+const mockUpdateResource = jest.fn();
 const mockListMatches = jest.fn();
+const mockGetUnseenMatchesCount = jest.fn();
+const mockMarkMatchesSeen = jest.fn();
 const mockLogout = jest.fn();
 
 const BOB = { id: 'bob-uuid', email: 'bob@example.com', name: 'Bob', provider: 'local', is_admin: false };
@@ -78,6 +82,12 @@ const MATCH_1: import('./lib/api').Match = {
   resource_title: 'Resource Alpha',
   resource_status: 'available',
   resource_owner_id: 'bob-uuid',
+  seen_at: null,
+};
+const MATCH_2_SEEN: import('./lib/api').Match = {
+  ...MATCH_1,
+  id: 'm2',
+  seen_at: '2026-04-15T12:30:00Z',
 };
 
 jest.mock('./lib/api', () => ({
@@ -87,12 +97,16 @@ jest.mock('./lib/api', () => ({
   searchNeeds: (...args: unknown[]) => mockSearchNeeds(...args),
   createNeed: (...args: unknown[]) => mockCreateNeed(...args),
   getOnNeed: (...args: unknown[]) => mockGetOnNeed(...args),
+  updateNeed: (...args: unknown[]) => mockUpdateNeed(...args),
   listResources: (...args: unknown[]) => mockListResources(...args),
   deleteResource: (...args: unknown[]) => mockDeleteResource(...args),
   searchResources: (...args: unknown[]) => mockSearchResources(...args),
   createResource: (...args: unknown[]) => mockCreateResource(...args),
   getOneResource: (...args: unknown[]) => mockGetOneResource(...args),
+  updateResource: (...args: unknown[]) => mockUpdateResource(...args),
   listMatches: (...args: unknown[]) => mockListMatches(...args),
+  getUnseenMatchesCount: (...args: unknown[]) => mockGetUnseenMatchesCount(...args),
+  markMatchesSeen: (...args: unknown[]) => mockMarkMatchesSeen(...args),
   logout: (...args: unknown[]) => mockLogout(...args),
 }));
 
@@ -103,9 +117,11 @@ import LoginPage from './pages/login';
 import NeedsPage from './pages/needs/index';
 import NewNeedPage from './pages/needs/new';
 import NeedDetailPage from './pages/needs/[id]';
+import EditNeedPage from './pages/needs/[id]/edit';
 import ResourcesPage from './pages/resources/index';
 import NewResourcePage from './pages/resources/new';
 import ResourceDetailPage from './pages/resources/[id]';
+import EditResourcePage from './pages/resources/[id]/edit';
 import MatchesPage from './pages/matches/index';
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -120,6 +136,8 @@ beforeEach(() => {
   routerState.pathname = '/';
   mockGetMe.mockResolvedValue(BOB);
   mockListMatches.mockResolvedValue([]);
+  mockGetUnseenMatchesCount.mockResolvedValue({ count: 0 });
+  mockMarkMatchesSeen.mockResolvedValue({ ok: true, marked: 0 });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -137,9 +155,16 @@ describe('Layout', () => {
   });
 
   it('shows a notification bubble when matches exist', async () => {
-    mockListMatches.mockResolvedValueOnce([MATCH_1]);
+    mockGetUnseenMatchesCount.mockResolvedValueOnce({ count: 1 });
     renderWithUser(<Layout><p>x</p></Layout>);
     await waitFor(() => expect(screen.getByRole('link', { name: 'Matches (1)' })).toBeInTheDocument());
+  });
+
+  it('hides bubble when unseen count is zero', async () => {
+    mockGetUnseenMatchesCount.mockResolvedValueOnce({ count: 0 });
+    renderWithUser(<Layout><p>x</p></Layout>);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Matches' })).toBeInTheDocument());
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
   it('shows email when name is null', async () => {
@@ -315,6 +340,7 @@ describe('NeedDetailPage', () => {
     await waitFor(() => expect(screen.getByText('Need Alpha')).toBeInTheDocument());
     expect(screen.getByText('open')).toBeInTheDocument();
     expect(screen.getByText('A need')).toBeInTheDocument();
+    expect(screen.getByText('Edit')).toBeInTheDocument();
   });
 
   it('shows "Need not found" on 404', async () => {
@@ -419,6 +445,7 @@ describe('ResourceDetailPage', () => {
     await waitFor(() => expect(screen.getByText('Resource Alpha')).toBeInTheDocument());
     expect(screen.getByText('available')).toBeInTheDocument();
     expect(screen.getByText('A resource')).toBeInTheDocument();
+    expect(screen.getByText('Edit')).toBeInTheDocument();
   });
 
   it('shows "Resource not found" on error', async () => {
@@ -429,20 +456,70 @@ describe('ResourceDetailPage', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// EditNeedPage
+// ─────────────────────────────────────────────────────────────
+describe('EditNeedPage', () => {
+  beforeEach(() => {
+    routerState.query = { id: 'n1' };
+    routerState.pathname = '/needs/n1/edit';
+    mockGetOnNeed.mockResolvedValue(NEED_1);
+  });
+
+  it('loads current need values and saves a new version', async () => {
+    mockUpdateNeed.mockResolvedValue({ ...NEED_1, id: 'n1v2', title: 'Need Alpha v2' });
+    renderWithUser(<EditNeedPage />);
+
+    await waitFor(() => expect(screen.getByDisplayValue('Need Alpha')).toBeInTheDocument());
+    await userEvent.clear(screen.getByLabelText(/Title/));
+    await userEvent.type(screen.getByLabelText(/Title/), 'Need Alpha v2');
+    await userEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => expect(mockUpdateNeed).toHaveBeenCalledWith('n1', expect.objectContaining({ title: 'Need Alpha v2' })));
+    expect(mockPush).toHaveBeenCalledWith('/needs/n1v2');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// EditResourcePage
+// ─────────────────────────────────────────────────────────────
+describe('EditResourcePage', () => {
+  beforeEach(() => {
+    routerState.query = { id: 'r1' };
+    routerState.pathname = '/resources/r1/edit';
+    mockGetOneResource.mockResolvedValue(RESOURCE_1);
+  });
+
+  it('loads current resource values and saves a new version', async () => {
+    mockUpdateResource.mockResolvedValue({ ...RESOURCE_1, id: 'r1v2', title: 'Resource Alpha v2' });
+    renderWithUser(<EditResourcePage />);
+
+    await waitFor(() => expect(screen.getByDisplayValue('Resource Alpha')).toBeInTheDocument());
+    await userEvent.clear(screen.getByLabelText(/Title/));
+    await userEvent.type(screen.getByLabelText(/Title/), 'Resource Alpha v2');
+    await userEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => expect(mockUpdateResource).toHaveBeenCalledWith('r1', expect.objectContaining({ title: 'Resource Alpha v2' })));
+    expect(mockPush).toHaveBeenCalledWith('/resources/r1v2');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 // MatchesPage
 // ─────────────────────────────────────────────────────────────
 describe('MatchesPage', () => {
-  it('renders filtered matches for the selected need', async () => {
+  it('renders filtered matches for the selected need and marks unseen as seen', async () => {
     routerState.query = { needId: 'n1' };
     routerState.pathname = '/matches';
-    mockListMatches.mockResolvedValue([MATCH_1]);
+    mockListMatches.mockResolvedValue([MATCH_1, MATCH_2_SEEN]);
 
     renderWithUser(<MatchesPage />);
 
     await waitFor(() => expect(screen.getByText('Matches For Need')).toBeInTheDocument());
-    expect(screen.getByText('Need Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Resource Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Strong fit')).toBeInTheDocument();
+    expect(screen.getAllByText('Need Alpha').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Resource Alpha').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Strong fit').length).toBeGreaterThan(0);
+    expect(screen.getByText('New')).toBeInTheDocument();
+    await waitFor(() => expect(mockMarkMatchesSeen).toHaveBeenCalledWith(['m1']));
   });
 });
 
@@ -522,6 +599,24 @@ describe('lib/api helpers', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('needId=need+1&resourceId=resource+1'),
       expect.anything()
+    );
+  });
+
+  it('getUnseenMatchesCount calls unseen-count endpoint', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ count: 3 }));
+    await api.getUnseenMatchesCount();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/unseen-count'),
+      expect.anything()
+    );
+  });
+
+  it('markMatchesSeen posts match ids', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ ok: true, marked: 1 }));
+    await api.markMatchesSeen(['m1']);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/seen'),
+      expect.objectContaining({ method: 'POST' })
     );
   });
 });

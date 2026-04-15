@@ -8,11 +8,12 @@
  *   env              "prod" or "non-prod" (default: "non-prod")
  *
  * Options:
- *   --needs    N     Number of needs to create    (0-100, default 10)
- *   --resources N    Number of resources to create (0-100, default 10)
+ *   --needs    N     Number of needs to create    (0-1000, default 10)
+ *   --resources N    Number of resources to create (0-1000, default 10)
  *   --owners   N     Distinct owners to assign      (1-10, default 5)
  *   --bob-pct  N     % of items owned by bob        (0-100, default 20)
  *                    (ignored when env=prod)
+ *   --public-pct N   % of items marked public       (0-100, default 100)
  *
  * Environment variable DATABASE_URL is read from .env (or inherited).
  */
@@ -37,6 +38,7 @@ interface Args {
   resources: number;
   owners: number;
   bobPct: number;
+  publicPct: number;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -46,6 +48,7 @@ function parseArgs(argv: string[]): Args {
     resources: 10,
     owners: 5,
     bobPct: 20,
+    publicPct: 100,
   };
 
   const positionals: string[] = [];
@@ -60,6 +63,8 @@ function parseArgs(argv: string[]): Args {
       args.owners = parseIntArg('--owners', argv[++i]);
     } else if (arg === '--bob-pct') {
       args.bobPct = parseIntArg('--bob-pct', argv[++i]);
+    } else if (arg === '--public-pct') {
+      args.publicPct = parseIntArg('--public-pct', argv[++i]);
     } else if (!arg.startsWith('--')) {
       positionals.push(arg);
     }
@@ -72,10 +77,11 @@ function parseArgs(argv: string[]): Args {
   }
 
   // Clamp & validate
-  if (args.needs < 0 || args.needs > 100) die('--needs must be between 0 and 100');
-  if (args.resources < 0 || args.resources > 100) die('--resources must be between 0 and 100');
+  if (args.needs < 0 || args.needs > 1000) die('--needs must be between 0 and 1000');
+  if (args.resources < 0 || args.resources > 1000) die('--resources must be between 0 and 1000');
   if (args.owners < 1 || args.owners > 10) die('--owners must be between 1 and 10');
   if (args.bobPct < 0 || args.bobPct > 100) die('--bob-pct must be between 0 and 100');
+  if (args.publicPct < 0 || args.publicPct > 100) die('--public-pct must be between 0 and 100');
 
   return args;
 }
@@ -133,11 +139,17 @@ async function ensureBob(): Promise<User> {
     'SELECT id, email FROM auth.users WHERE email = $1',
     ['bob@local.dev']
   );
-  if (existing) return existing;
+  if (existing) {
+    await query(
+      'UPDATE auth.users SET is_admin = true WHERE id = $1',
+      [existing.id]
+    );
+    return existing;
+  }
 
   const created = await queryOne<User>(
-    `INSERT INTO auth.users (email, name, provider)
-     VALUES ($1, $2, 'local')
+    `INSERT INTO auth.users (email, name, provider, is_admin)
+     VALUES ($1, $2, 'local', true)
      RETURNING id, email`,
     ['bob@local.dev', 'Bob']
   );
@@ -179,6 +191,15 @@ function buildOwnerIds(
   return ids;
 }
 
+/** Build is_public values for `total` items based on publicPct. */
+function buildPublicFlags(total: number, publicPct: number): boolean[] {
+  const flags: boolean[] = [];
+  for (let i = 0; i < total; i++) {
+    flags.push(Math.random() * 100 < publicPct);
+  }
+  return flags;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -187,7 +208,8 @@ async function main(): Promise<void> {
   console.log(
     `\nGenerating test data [env=${args.env}] ` +
       `needs=${args.needs} resources=${args.resources} ` +
-      `owners=${args.owners} bob-pct=${args.env === 'prod' ? 'n/a' : args.bobPct + '%'}\n`
+      `owners=${args.owners} bob-pct=${args.env === 'prod' ? 'n/a' : args.bobPct + '%'} ` +
+      `public-pct=${args.publicPct}%\n`
   );
 
   // 1. Ensure the 100-owner pool exists
@@ -212,19 +234,22 @@ async function main(): Promise<void> {
   // 4. Build owner-id lists
   const needOwnerIds = buildOwnerIds(args.needs, activeOwners, bob, args.env === 'prod' ? 0 : args.bobPct);
   const resourceOwnerIds = buildOwnerIds(args.resources, activeOwners, bob, args.env === 'prod' ? 0 : args.bobPct);
+  const needPublicFlags = buildPublicFlags(args.needs, args.publicPct);
+  const resourcePublicFlags = buildPublicFlags(args.resources, args.publicPct);
 
   // 5. Insert needs
   if (args.needs > 0) {
     process.stdout.write(`Inserting ${args.needs} need(s) … `);
     for (let i = 0; i < args.needs; i++) {
       await query(
-        `INSERT INTO need.needs (title, description, status, owner_id)
-         VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO need.needs (title, description, status, owner_id, is_public)
+         VALUES ($1, $2, $3, $4, $5)`,
         [
           randomNeedTitle(),
           randomDescription('need'),
           randomNeedStatus(),
           needOwnerIds[i]!,
+          needPublicFlags[i]!,
         ]
       );
     }
@@ -236,13 +261,14 @@ async function main(): Promise<void> {
     process.stdout.write(`Inserting ${args.resources} resource(s) … `);
     for (let i = 0; i < args.resources; i++) {
       await query(
-        `INSERT INTO resource.resources (title, description, status, owner_id)
-         VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO resource.resources (title, description, status, owner_id, is_public)
+         VALUES ($1, $2, $3, $4, $5)`,
         [
           randomResourceTitle(),
           randomDescription('resource'),
           randomResourceStatus(),
           resourceOwnerIds[i]!,
+          resourcePublicFlags[i]!,
         ]
       );
     }
@@ -252,10 +278,12 @@ async function main(): Promise<void> {
   // 7. Summary
   const needBobCount = needOwnerIds.filter((id) => id === bob?.id).length;
   const resourceBobCount = resourceOwnerIds.filter((id) => id === bob?.id).length;
+  const needPublicCount = needPublicFlags.filter(Boolean).length;
+  const resourcePublicCount = resourcePublicFlags.filter(Boolean).length;
 
   console.log('\n── Summary ──────────────────────────────');
-  console.log(`  Needs created   : ${args.needs}${bob ? ` (${needBobCount} owned by bob)` : ''}`);
-  console.log(`  Resources created: ${args.resources}${bob ? ` (${resourceBobCount} owned by bob)` : ''}`);
+  console.log(`  Needs created   : ${args.needs}${bob ? ` (${needBobCount} owned by bob)` : ''}, ${needPublicCount} public`);
+  console.log(`  Resources created: ${args.resources}${bob ? ` (${resourceBobCount} owned by bob)` : ''}, ${resourcePublicCount} public`);
   console.log(`  Distinct owners : ${args.owners}`);
   console.log('─────────────────────────────────────────\n');
 }

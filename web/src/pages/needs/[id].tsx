@@ -60,14 +60,22 @@ export default function NeedDetailPage() {
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">{need.title}</h1>
+              <div className="mt-2 flex items-center gap-3">
+                <Link
+                  href={`/needs/${encodeURIComponent(need.id)}/edit`}
+                  className="inline-flex text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                >
+                  Edit
+                </Link>
               {matchCount > 0 && (
                 <Link
                   href={`/matches?needId=${encodeURIComponent(need.id)}`}
-                  className="mt-2 inline-flex text-sm font-semibold text-green-700 hover:text-green-800"
+                  className="inline-flex text-sm font-semibold text-green-700 hover:text-green-800"
                 >
                   Matched!
                 </Link>
               )}
+              </div>
             </div>
             <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${STATUS_COLOURS[need.status] ?? 'bg-gray-100 text-gray-600'}`}>
               {need.status}
