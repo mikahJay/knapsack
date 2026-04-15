@@ -142,6 +142,42 @@ describe('Resources CRUD — unauthenticated returns 401', () => {
   });
 });
 
+// ── Matches ───────────────────────────────────────────────────
+describe('Matches — authenticated', () => {
+  let agent: ReturnType<typeof request.agent>;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    agent = await makeLoggedInAgent();
+    mockQueryOne.mockResolvedValue(BOB);
+  });
+
+  it('GET /api/matches returns current user matches ordered by latest first', async () => {
+    const matches = [
+      {
+        id: 'm1',
+        need_id: 'n1',
+        resource_id: 'r1',
+        score: 0.98,
+        rationale: 'Strong fit',
+        strategy: 'claude',
+        matched_at: '2026-04-15T09:00:00Z',
+        need_title: 'Need Alpha',
+        need_status: 'open',
+        need_owner_id: BOB.id,
+        resource_title: 'Resource Alpha',
+        resource_status: 'available',
+        resource_owner_id: 'other-uuid',
+      },
+    ];
+    mockQuery.mockResolvedValueOnce(matches);
+
+    const res = await agent.get('/api/matches');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(matches);
+  });
+});
+
 describe('Resources CRUD — authenticated', () => {
   let agent: ReturnType<typeof request.agent>;
 

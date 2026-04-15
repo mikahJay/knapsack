@@ -43,6 +43,22 @@ export interface Resource {
   updated_at: string;
 }
 
+export interface Match {
+  id: UUID;
+  need_id: UUID;
+  resource_id: UUID;
+  score: number;
+  rationale: string | null;
+  strategy: string;
+  matched_at: string;
+  need_title: string;
+  need_status: string;
+  need_owner_id: UUID | null;
+  resource_title: string;
+  resource_status: string;
+  resource_owner_id: UUID | null;
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -91,6 +107,15 @@ export const deleteResource = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' });
 export const searchResources = (q: string) =>
   apiFetch<Resource[]>(`/api/resources/search?q=${encodeURIComponent(q)}`);
+
+// ── Matches ───────────────────────────────────────────────────
+export const listMatches = (filters?: { needId?: string; resourceId?: string }) => {
+  const params = new URLSearchParams();
+  if (filters?.needId) params.set('needId', filters.needId);
+  if (filters?.resourceId) params.set('resourceId', filters.resourceId);
+  const suffix = params.toString();
+  return apiFetch<Match[]>(`/api/matches${suffix ? `?${suffix}` : ''}`);
+};
 
 // ── Admin ─────────────────────────────────────────────────────
 export interface RematchStats {

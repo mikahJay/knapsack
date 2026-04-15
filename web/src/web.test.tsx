@@ -45,9 +45,10 @@ const mockDeleteResource = jest.fn();
 const mockSearchResources = jest.fn();
 const mockCreateResource = jest.fn();
 const mockGetOneResource = jest.fn();
+const mockListMatches = jest.fn();
 const mockLogout = jest.fn();
 
-const BOB = { id: 'bob-uuid', email: 'bob@example.com', name: 'Bob', provider: 'local' };
+const BOB = { id: 'bob-uuid', email: 'bob@example.com', name: 'Bob', provider: 'local', is_admin: false };
 const NEED_1: import('./lib/api').Need = {
   id: 'n1', title: 'Need Alpha', description: 'A need', status: 'open',
   is_public: true, quantity: 1, needed_by: null, owner_id: 'bob-uuid',
@@ -63,6 +64,21 @@ const RESOURCE_1: import('./lib/api').Resource = {
   is_public: true, quantity: 3, available_until: null, owner_id: 'bob-uuid',
   created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
 };
+const MATCH_1: import('./lib/api').Match = {
+  id: 'm1',
+  need_id: 'n1',
+  resource_id: 'r1',
+  score: 0.95,
+  rationale: 'Strong fit',
+  strategy: 'claude',
+  matched_at: '2026-04-15T12:00:00Z',
+  need_title: 'Need Alpha',
+  need_status: 'open',
+  need_owner_id: 'bob-uuid',
+  resource_title: 'Resource Alpha',
+  resource_status: 'available',
+  resource_owner_id: 'bob-uuid',
+};
 
 jest.mock('./lib/api', () => ({
   getMe: (...args: unknown[]) => mockGetMe(...args),
@@ -76,6 +92,7 @@ jest.mock('./lib/api', () => ({
   searchResources: (...args: unknown[]) => mockSearchResources(...args),
   createResource: (...args: unknown[]) => mockCreateResource(...args),
   getOneResource: (...args: unknown[]) => mockGetOneResource(...args),
+  listMatches: (...args: unknown[]) => mockListMatches(...args),
   logout: (...args: unknown[]) => mockLogout(...args),
 }));
 
@@ -89,6 +106,7 @@ import NeedDetailPage from './pages/needs/[id]';
 import ResourcesPage from './pages/resources/index';
 import NewResourcePage from './pages/resources/new';
 import ResourceDetailPage from './pages/resources/[id]';
+import MatchesPage from './pages/matches/index';
 
 // ── Helpers ───────────────────────────────────────────────────
 function renderWithUser(component: React.ReactElement) {
@@ -101,6 +119,7 @@ beforeEach(() => {
   routerState.query = {};
   routerState.pathname = '/';
   mockGetMe.mockResolvedValue(BOB);
+  mockListMatches.mockResolvedValue([]);
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -113,7 +132,14 @@ describe('Layout', () => {
     expect(screen.getByText('knapsack')).toBeInTheDocument();
     expect(screen.getByText('Needs')).toBeInTheDocument();
     expect(screen.getByText('Resources')).toBeInTheDocument();
+    expect(screen.getByText('Matches')).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
+  });
+
+  it('shows a notification bubble when matches exist', async () => {
+    mockListMatches.mockResolvedValueOnce([MATCH_1]);
+    renderWithUser(<Layout><p>x</p></Layout>);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Matches (1)' })).toBeInTheDocument());
   });
 
   it('shows email when name is null', async () => {
@@ -179,6 +205,13 @@ describe('NeedsPage', () => {
     renderWithUser(<NeedsPage />);
     await waitFor(() => expect(screen.getByText('Need Alpha')).toBeInTheDocument());
     expect(screen.getByText('Need Beta')).toBeInTheDocument();
+  });
+
+  it('shows a Matched! link for owned matched needs', async () => {
+    mockListMatches.mockResolvedValue([MATCH_1]);
+    renderWithUser(<NeedsPage />);
+    await waitFor(() => expect(screen.getByText('Need Alpha')).toBeInTheDocument());
+    expect(screen.getByText('Matched!')).toBeInTheDocument();
   });
 
   it('shows "No needs yet" when list is empty', async () => {
@@ -396,6 +429,24 @@ describe('ResourceDetailPage', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// MatchesPage
+// ─────────────────────────────────────────────────────────────
+describe('MatchesPage', () => {
+  it('renders filtered matches for the selected need', async () => {
+    routerState.query = { needId: 'n1' };
+    routerState.pathname = '/matches';
+    mockListMatches.mockResolvedValue([MATCH_1]);
+
+    renderWithUser(<MatchesPage />);
+
+    await waitFor(() => expect(screen.getByText('Matches For Need')).toBeInTheDocument());
+    expect(screen.getByText('Need Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Resource Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Strong fit')).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 // lib/api — unit tests (no DOM needed)
 // ─────────────────────────────────────────────────────────────
 describe('lib/api helpers', () => {
@@ -461,6 +512,15 @@ describe('lib/api helpers', () => {
     await api.searchResources('foo bar');
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('q=foo%20bar'),
+      expect.anything()
+    );
+  });
+
+  it('listMatches encodes filter parameters', async () => {
+    mockFetch.mockReturnValueOnce(okResponse([]));
+    await api.listMatches({ needId: 'need 1', resourceId: 'resource 1' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('needId=need+1&resourceId=resource+1'),
       expect.anything()
     );
   });

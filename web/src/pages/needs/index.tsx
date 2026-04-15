@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { listNeeds, deleteNeed, Need, searchNeeds, getMe } from '../../lib/api';
+import { listNeeds, deleteNeed, Need, searchNeeds, getMe, listMatches } from '../../lib/api';
 
 const STATUS_COLOURS: Record<string, string> = {
   open: 'bg-green-100 text-green-700',
@@ -25,6 +25,7 @@ export default function NeedsPage() {
   const [searchResults, setSearchResults] = useState<Need[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [matchedNeedIds, setMatchedNeedIds] = useState<string[]>([]);
 
   useEffect(() => {
     listNeeds().then(setNeeds).finally(() => setLoading(false));
@@ -32,6 +33,14 @@ export default function NeedsPage() {
 
   useEffect(() => {
     getMe().then((u) => setCurrentUserId(u.id)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    listMatches()
+      .then((matches) => {
+        setMatchedNeedIds([...new Set(matches.map((match) => match.need_id))]);
+      })
+      .catch(() => setMatchedNeedIds([]));
   }, []);
 
   useEffect(() => {
@@ -58,6 +67,7 @@ export default function NeedsPage() {
 
   const alphaCount = (query.match(/[a-zA-Z]/g) ?? []).length;
   const remaining = Math.max(0, 5 - alphaCount);
+  const matchedNeedIdSet = new Set(matchedNeedIds);
 
   return (
     <Layout>
@@ -147,6 +157,14 @@ export default function NeedsPage() {
                   >
                     {need.title}
                   </Link>
+                  {matchedNeedIdSet.has(need.id) && (
+                    <Link
+                      href={`/matches?needId=${encodeURIComponent(need.id)}`}
+                      className="text-sm font-semibold text-green-700 hover:text-green-800"
+                    >
+                      Matched!
+                    </Link>
+                  )}
                   {need.quantity > 1 && (
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
                       ×{need.quantity}
