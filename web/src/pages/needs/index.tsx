@@ -73,12 +73,20 @@ export default function NeedsPage() {
     <Layout>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-800">Needs</h1>
-        <Link
-          href="/needs/new"
-          className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-        >
-          + New Need
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/needs/import"
+            className="border border-indigo-200 text-indigo-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-50 transition"
+          >
+            Bulk Import
+          </Link>
+          <Link
+            href="/needs/new"
+            className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+          >
+            + New Need
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6">

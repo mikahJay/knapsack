@@ -163,6 +163,29 @@ describe('Needs CRUD — authenticated', () => {
     expect(client.query).toHaveBeenCalledWith('COMMIT');
     expect(client.release).toHaveBeenCalled();
   });
+
+  it('POST /api/needs/import/commit creates reviewed drafts', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [{ id: 'n-import-1', title: 'Imported Need 1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'n-import-2', title: 'Imported Need 2' }] })
+        .mockResolvedValueOnce({}),
+      release: jest.fn(),
+    };
+    mockPool.connect.mockResolvedValueOnce(client);
+
+    const res = await agent.post('/api/needs/import/commit').send({
+      items: [
+        { title: 'Imported Need 1', quantity: 1, status: 'open', is_public: true },
+        { title: 'Imported Need 2', quantity: 2, status: 'open', is_public: true },
+      ],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.length).toBe(2);
+  });
 });
 
 // ── Resources CRUD ────────────────────────────────────────────
@@ -304,6 +327,29 @@ describe('Resources CRUD — authenticated', () => {
     expect(client.query).toHaveBeenCalledWith('BEGIN');
     expect(client.query).toHaveBeenCalledWith('COMMIT');
     expect(client.release).toHaveBeenCalled();
+  });
+
+  it('POST /api/resources/import/commit creates reviewed drafts', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [{ id: 'r-import-1', title: 'Imported Resource 1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'r-import-2', title: 'Imported Resource 2' }] })
+        .mockResolvedValueOnce({}),
+      release: jest.fn(),
+    };
+    mockPool.connect.mockResolvedValueOnce(client);
+
+    const res = await agent.post('/api/resources/import/commit').send({
+      items: [
+        { title: 'Imported Resource 1', quantity: 1, status: 'available', is_public: true },
+        { title: 'Imported Resource 2', quantity: 2, status: 'available', is_public: true },
+      ],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.length).toBe(2);
   });
 });
 

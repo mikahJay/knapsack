@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import Layout from '../../components/Layout';
 import { createResource } from '../../lib/api';
 
@@ -41,7 +42,15 @@ export default function NewResourcePage() {
   return (
     <Layout>
       <div className="max-w-lg">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">New Resource</h1>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-gray-800">New Resource</h1>
+          <Link
+            href="/resources/import"
+            className="border border-indigo-200 text-indigo-700 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition"
+          >
+            Bulk Import
+          </Link>
+        </div>
         {error && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</div>
         )}

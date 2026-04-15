@@ -3,6 +3,7 @@ import { query, queryOne, pool } from '../db';
 import { requireAuth } from '../auth/router';
 import { AppUser } from '../auth/passport';
 import type { UUID } from '../types';
+import { previewResourcesFromText, ImportResourceItem, ImportPreviewError } from '../import/claude';
 
 export interface Resource {
   id: UUID;
@@ -63,6 +64,72 @@ resourcesRouter.get('/search', async (req: Request, res: Response, next: NextFun
       [userId, q]
     );
     res.json(resources);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/resources/import/preview — parse free text into draft resources
+resourcesRouter.post('/import/preview', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text : '';
+    const preview = await previewResourcesFromText(text);
+    res.json(preview);
+  } catch (err) {
+    if (err instanceof ImportPreviewError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    next(err);
+  }
+});
+
+// POST /api/resources/import/commit — persist reviewed resource drafts
+resourcesRouter.post('/import/commit', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const raw = req.body?.items;
+    if (!Array.isArray(raw)) return res.status(400).json({ error: 'items must be an array' });
+    if (raw.length === 0) return res.json([]);
+
+    const userId = (req.user as AppUser).id;
+    const items = raw as ImportResourceItem[];
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      const created: Resource[] = [];
+      for (const item of items) {
+        const title = typeof item.title === 'string' ? item.title.trim() : '';
+        if (!title) continue;
+
+        const quantity = Number.isFinite(Number(item.quantity)) && Number(item.quantity) >= 1
+          ? Math.floor(Number(item.quantity))
+          : 1;
+        const status = ['available', 'allocated', 'retired'].includes(item.status) ? item.status : 'available';
+
+        const inserted = await client.query<Resource>(
+          `INSERT INTO resource.resources (title, description, status, is_public, quantity, available_until, owner_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [
+            title,
+            item.description?.trim() || null,
+            status,
+            item.is_public ?? true,
+            quantity,
+            item.available_until?.trim() || null,
+            userId,
+          ]
+        );
+        if (inserted.rows[0]) created.push(inserted.rows[0]);
+      }
+      await client.query('COMMIT');
+      res.status(201).json(created);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }

@@ -41,12 +41,16 @@ const mockSearchNeeds = jest.fn();
 const mockCreateNeed = jest.fn();
 const mockGetOnNeed = jest.fn();
 const mockUpdateNeed = jest.fn();
+const mockPreviewNeedImport = jest.fn();
+const mockCommitNeedImport = jest.fn();
 const mockListResources = jest.fn();
 const mockDeleteResource = jest.fn();
 const mockSearchResources = jest.fn();
 const mockCreateResource = jest.fn();
 const mockGetOneResource = jest.fn();
 const mockUpdateResource = jest.fn();
+const mockPreviewResourceImport = jest.fn();
+const mockCommitResourceImport = jest.fn();
 const mockListMatches = jest.fn();
 const mockGetUnseenMatchesCount = jest.fn();
 const mockMarkMatchesSeen = jest.fn();
@@ -98,12 +102,16 @@ jest.mock('./lib/api', () => ({
   createNeed: (...args: unknown[]) => mockCreateNeed(...args),
   getOnNeed: (...args: unknown[]) => mockGetOnNeed(...args),
   updateNeed: (...args: unknown[]) => mockUpdateNeed(...args),
+  previewNeedImport: (...args: unknown[]) => mockPreviewNeedImport(...args),
+  commitNeedImport: (...args: unknown[]) => mockCommitNeedImport(...args),
   listResources: (...args: unknown[]) => mockListResources(...args),
   deleteResource: (...args: unknown[]) => mockDeleteResource(...args),
   searchResources: (...args: unknown[]) => mockSearchResources(...args),
   createResource: (...args: unknown[]) => mockCreateResource(...args),
   getOneResource: (...args: unknown[]) => mockGetOneResource(...args),
   updateResource: (...args: unknown[]) => mockUpdateResource(...args),
+  previewResourceImport: (...args: unknown[]) => mockPreviewResourceImport(...args),
+  commitResourceImport: (...args: unknown[]) => mockCommitResourceImport(...args),
   listMatches: (...args: unknown[]) => mockListMatches(...args),
   getUnseenMatchesCount: (...args: unknown[]) => mockGetUnseenMatchesCount(...args),
   markMatchesSeen: (...args: unknown[]) => mockMarkMatchesSeen(...args),
@@ -116,10 +124,12 @@ import HomePage from './pages/index';
 import LoginPage from './pages/login';
 import NeedsPage from './pages/needs/index';
 import NewNeedPage from './pages/needs/new';
+import NeedBulkImportPage from './pages/needs/import';
 import NeedDetailPage from './pages/needs/[id]';
 import EditNeedPage from './pages/needs/[id]/edit';
 import ResourcesPage from './pages/resources/index';
 import NewResourcePage from './pages/resources/new';
+import ResourceBulkImportPage from './pages/resources/import';
 import ResourceDetailPage from './pages/resources/[id]';
 import EditResourcePage from './pages/resources/[id]/edit';
 import MatchesPage from './pages/matches/index';
@@ -138,6 +148,10 @@ beforeEach(() => {
   mockListMatches.mockResolvedValue([]);
   mockGetUnseenMatchesCount.mockResolvedValue({ count: 0 });
   mockMarkMatchesSeen.mockResolvedValue({ ok: true, marked: 0 });
+  mockPreviewNeedImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
+  mockPreviewResourceImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
+  mockCommitNeedImport.mockResolvedValue([]);
+  mockCommitResourceImport.mockResolvedValue([]);
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -326,6 +340,30 @@ describe('NewNeedPage', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// NeedBulkImportPage
+// ─────────────────────────────────────────────────────────────
+describe('NeedBulkImportPage', () => {
+  it('previews and commits reviewed need drafts', async () => {
+    routerState.pathname = '/needs/import';
+    mockPreviewNeedImport.mockResolvedValue({
+      items: [{ title: 'Blankets', description: 'Warm blankets', quantity: 5, status: 'open', is_public: true, needed_by: null }],
+      estimatedTokens: 20,
+      inputTokenLimit: 100000,
+      inputMaxChars: 400000,
+    });
+
+    renderWithUser(<NeedBulkImportPage />);
+    await waitFor(() => expect(screen.getByText('Bulk Import Needs')).toBeInTheDocument());
+    await userEvent.type(screen.getByLabelText(/Source text/i), 'We need blankets and coats');
+    await userEvent.click(screen.getByText('Preview Drafts'));
+
+    await waitFor(() => expect(screen.getByDisplayValue('Blankets')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('Import 1 Needs'));
+    await waitFor(() => expect(mockCommitNeedImport).toHaveBeenCalled());
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 // NeedDetailPage
 // ─────────────────────────────────────────────────────────────
 describe('NeedDetailPage', () => {
@@ -427,6 +465,30 @@ describe('NewResourcePage', () => {
     const input = screen.getByLabelText(/Available until/) as HTMLInputElement;
     const sevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     expect(input.value).toBe(sevenDays);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// ResourceBulkImportPage
+// ─────────────────────────────────────────────────────────────
+describe('ResourceBulkImportPage', () => {
+  it('previews and commits reviewed resource drafts', async () => {
+    routerState.pathname = '/resources/import';
+    mockPreviewResourceImport.mockResolvedValue({
+      items: [{ title: 'Projector', description: 'HD projector', quantity: 1, status: 'available', is_public: true, available_until: null }],
+      estimatedTokens: 20,
+      inputTokenLimit: 100000,
+      inputMaxChars: 400000,
+    });
+
+    renderWithUser(<ResourceBulkImportPage />);
+    await waitFor(() => expect(screen.getByText('Bulk Import Resources')).toBeInTheDocument());
+    await userEvent.type(screen.getByLabelText(/Source text/i), 'We have one projector to lend');
+    await userEvent.click(screen.getByText('Preview Drafts'));
+
+    await waitFor(() => expect(screen.getByDisplayValue('Projector')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('Import 1 Resources'));
+    await waitFor(() => expect(mockCommitResourceImport).toHaveBeenCalled());
   });
 });
 
@@ -616,6 +678,24 @@ describe('lib/api helpers', () => {
     await api.markMatchesSeen(['m1']);
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/matches/seen'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('previewNeedImport posts free text', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ items: [], estimatedTokens: 1, inputTokenLimit: 100000, inputMaxChars: 400000 }));
+    await api.previewNeedImport('need tents and blankets');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/needs/import/preview'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('previewResourceImport posts free text', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ items: [], estimatedTokens: 1, inputTokenLimit: 100000, inputMaxChars: 400000 }));
+    await api.previewResourceImport('have tents and blankets');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/resources/import/preview'),
       expect.objectContaining({ method: 'POST' })
     );
   });
