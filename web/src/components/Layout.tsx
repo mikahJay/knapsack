@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ReactNode, useEffect, useState } from 'react';
-import { getMe, getUnseenMatchesCount, logout, User } from '../lib/api';
+import { getMe, getUnseenMatchesCount, login, logout, User } from '../lib/api';
 
 interface LayoutProps {
   children: ReactNode;
 }
+
+const IS_PROD = process.env['NEXT_PUBLIC_IS_PROD'] === 'true';
 
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
@@ -31,7 +33,20 @@ export default function Layout({ children }: LayoutProps) {
         setUser(currentUser);
         await refreshUnseenCount();
       })
-      .catch(() => router.push('/login'));
+      .catch(async () => {
+        if (!IS_PROD) {
+          try {
+            await login();
+            const currentUser = await getMe();
+            setUser(currentUser);
+            await refreshUnseenCount();
+            return;
+          } catch {
+            // Fall through to explicit login page if bypass login fails.
+          }
+        }
+        router.push('/login');
+      });
 
     window.addEventListener('matches:refresh-unseen', handleRefresh);
     return () => {

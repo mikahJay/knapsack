@@ -41,6 +41,29 @@ export interface Resource {
   owner_id: UUID | null;
   created_at: string;
   updated_at: string;
+  photo?: ResourcePhotoAttachment | null;
+}
+
+export interface ResourcePhotoBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ResourcePhotoDetection {
+  label: string;
+  confidence: number;
+  box: ResourcePhotoBoundingBox;
+}
+
+export interface ResourcePhotoAttachment {
+  mimeType: string;
+  imageBase64: string;
+  width: number;
+  height: number;
+  focusBox: ResourcePhotoBoundingBox | null;
+  detections: ResourcePhotoDetection[];
 }
 
 export interface NeedImportDraft {
@@ -59,6 +82,7 @@ export interface ResourceImportDraft {
   status: 'available' | 'allocated' | 'retired';
   is_public: boolean;
   available_until: string | null;
+  photo?: ResourcePhotoAttachment;
 }
 
 export type PhotoImportReasonCode =
@@ -79,12 +103,14 @@ export interface PhotoImportDiagnostics {
   moderationVerdict: 'safe' | 'unsafe' | 'ambiguous';
   relevanceVerdict: 'resource' | 'not_resource';
   extractedTextPreview: string;
+  detectionsCount?: number;
 }
 
 export type ResourcePhotoPreviewResponse =
   | {
       status: 'allow';
       draft: ResourceImportDraft & { evidence_status: 'photo_attached' };
+      additionalDrafts?: Array<ResourceImportDraft & { evidence_status: 'photo_attached' }>;
       diagnostics?: PhotoImportDiagnostics;
     }
   | {

@@ -52,6 +52,7 @@ const mockUpdateResource = jest.fn();
 const mockPreviewResourceImport = jest.fn();
 const mockPreviewResourcePhotoImport = jest.fn();
 const mockCommitResourceImport = jest.fn();
+const mockLogin = jest.fn();
 const mockListMatches = jest.fn();
 const mockGetUnseenMatchesCount = jest.fn();
 const mockMarkMatchesSeen = jest.fn();
@@ -72,6 +73,14 @@ const RESOURCE_1: import('./lib/api').Resource = {
   id: 'r1', title: 'Resource Alpha', description: 'A resource', status: 'available',
   is_public: true, quantity: 3, available_until: null, owner_id: 'bob-uuid',
   created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+  photo: {
+    mimeType: 'image/jpeg',
+    imageBase64: 'ZmFrZS1pbWFnZS1ieXRlcw==',
+    width: 1200,
+    height: 800,
+    focusBox: { x: 0.2, y: 0.25, width: 0.3, height: 0.4 },
+    detections: [{ label: 'Mouse', confidence: 0.92, box: { x: 0.2, y: 0.25, width: 0.3, height: 0.4 } }],
+  },
 };
 const MATCH_1: import('./lib/api').Match = {
   id: 'm1',
@@ -114,6 +123,7 @@ jest.mock('./lib/api', () => ({
   previewResourceImport: (...args: unknown[]) => mockPreviewResourceImport(...args),
   previewResourcePhotoImport: (...args: unknown[]) => mockPreviewResourcePhotoImport(...args),
   commitResourceImport: (...args: unknown[]) => mockCommitResourceImport(...args),
+  login: (...args: unknown[]) => mockLogin(...args),
   listMatches: (...args: unknown[]) => mockListMatches(...args),
   getUnseenMatchesCount: (...args: unknown[]) => mockGetUnseenMatchesCount(...args),
   markMatchesSeen: (...args: unknown[]) => mockMarkMatchesSeen(...args),
@@ -138,6 +148,7 @@ import MatchesPage from './pages/matches/index';
 
 // ── Helpers ───────────────────────────────────────────────────
 function renderWithUser(component: React.ReactElement) {
+  mockLogin.mockResolvedValue(BOB);
   mockGetMe.mockResolvedValue(BOB);
   return render(component);
 }
@@ -152,6 +163,7 @@ beforeEach(() => {
   mockMarkMatchesSeen.mockResolvedValue({ ok: true, marked: 0 });
   mockPreviewNeedImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
   mockPreviewResourceImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 1000 });
+  mockLogin.mockResolvedValue(BOB);
   mockPreviewResourcePhotoImport.mockResolvedValue({
     status: 'allow',
     draft: {
@@ -163,6 +175,17 @@ beforeEach(() => {
       available_until: null,
       evidence_status: 'photo_attached',
     },
+    additionalDrafts: [
+      {
+        title: 'Coffee Mug',
+        description: null,
+        quantity: 1,
+        status: 'available',
+        is_public: false,
+        available_until: null,
+        evidence_status: 'photo_attached',
+      },
+    ],
     diagnostics: {
       provider: 'claude',
       model: 'claude-3-haiku-20240307',
@@ -171,6 +194,7 @@ beforeEach(() => {
       moderationVerdict: 'safe',
       relevanceVerdict: 'resource',
       extractedTextPreview: 'wireless mouse',
+      detectionsCount: 2,
     },
   });
   mockCommitNeedImport.mockResolvedValue([]);
@@ -210,7 +234,8 @@ describe('Layout', () => {
     await waitFor(() => expect(screen.getByText(BOB.email)).toBeInTheDocument());
   });
 
-  it('redirects to /login if getMe rejects', async () => {
+  it('redirects to /login if auth bootstrap fails', async () => {
+    mockLogin.mockRejectedValueOnce(new Error('login failed'));
     mockGetMe.mockRejectedValueOnce(new Error('unauth'));
     render(<Layout><p>x</p></Layout>);
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/login'));
@@ -526,8 +551,10 @@ describe('ResourceBulkImportPage', () => {
 
     await waitFor(() => expect(mockPreviewResourcePhotoImport).toHaveBeenCalled());
     expect(screen.getByDisplayValue('Photo resource draft')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Coffee Mug')).toBeInTheDocument();
     expect(screen.getByText(/Photo diagnostics \(non-prod\)/i)).toBeInTheDocument();
     expect(screen.getByText(/provider: claude/i)).toBeInTheDocument();
+    expect(screen.getByText(/detectionsCount: 2/i)).toBeInTheDocument();
   });
 });
 
@@ -547,6 +574,15 @@ describe('ResourceDetailPage', () => {
     expect(screen.getByText('available')).toBeInTheDocument();
     expect(screen.getByText('A resource')).toBeInTheDocument();
     expect(screen.getByText('Edit')).toBeInTheDocument();
+    expect(screen.getByText(/Click to open highlighted photo/i)).toBeInTheDocument();
+  });
+
+  it('opens enlarged highlighted photo when thumbnail is clicked', async () => {
+    mockGetOneResource.mockResolvedValue(RESOURCE_1);
+    renderWithUser(<ResourceDetailPage />);
+    await waitFor(() => expect(screen.getByText('Resource Alpha')).toBeInTheDocument());
+    await userEvent.click(screen.getByText(/Click to open highlighted photo/i));
+    expect(screen.getByAltText('Resource full')).toBeInTheDocument();
   });
 
   it('shows "Resource not found" on error', async () => {

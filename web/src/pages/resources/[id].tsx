@@ -26,6 +26,7 @@ export default function ResourceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
+  const [isPhotoOpen, setIsPhotoOpen] = useState(false);
 
   useEffect(() => {
     if (!id || typeof id !== 'string') return;
@@ -82,6 +83,38 @@ export default function ResourceDetailPage() {
             </span>
           </div>
           {resource.description && <p className="text-gray-600 mb-4">{resource.description}</p>}
+
+          {resource.photo?.imageBase64 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Photo</p>
+              <button
+                type="button"
+                onClick={() => setIsPhotoOpen(true)}
+                className="group relative overflow-hidden rounded-lg border border-gray-200"
+              >
+                <img
+                  src={`data:${resource.photo.mimeType};base64,${resource.photo.imageBase64}`}
+                  alt="Resource thumbnail"
+                  className="h-28 w-28 object-cover"
+                />
+                {resource.photo.focusBox && (
+                  <span
+                    className="pointer-events-none absolute border-2 border-emerald-500 bg-emerald-400/10"
+                    style={{
+                      left: `${resource.photo.focusBox.x * 100}%`,
+                      top: `${resource.photo.focusBox.y * 100}%`,
+                      width: `${resource.photo.focusBox.width * 100}%`,
+                      height: `${resource.photo.focusBox.height * 100}%`,
+                    }}
+                  />
+                )}
+                <span className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1 text-[11px] font-medium text-white">
+                  Click to open highlighted photo
+                </span>
+              </button>
+            </div>
+          )}
+
           <dl className="space-y-1.5 text-sm">
             <div className="flex gap-2">
               <dt className="text-gray-500 w-28 shrink-0">Quantity</dt>
@@ -102,6 +135,36 @@ export default function ResourceDetailPage() {
               </div>
             )}
           </dl>
+        </div>
+      )}
+
+      {resource?.photo?.imageBase64 && isPhotoOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6" onClick={() => setIsPhotoOpen(false)}>
+          <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setIsPhotoOpen(false)}
+              className="absolute -top-10 right-0 text-white text-sm font-semibold"
+            >
+              Close
+            </button>
+            <img
+              src={`data:${resource.photo.mimeType};base64,${resource.photo.imageBase64}`}
+              alt="Resource full"
+              className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+            />
+            {resource.photo.focusBox && (
+              <span
+                className="pointer-events-none absolute border-4 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]"
+                style={{
+                  left: `${resource.photo.focusBox.x * 100}%`,
+                  top: `${resource.photo.focusBox.y * 100}%`,
+                  width: `${resource.photo.focusBox.width * 100}%`,
+                  height: `${resource.photo.focusBox.height * 100}%`,
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
     </Layout>

@@ -157,7 +157,16 @@ export default function ResourcesPage() {
               key={resource.id}
               className="bg-white rounded-xl shadow-sm p-5 flex items-start justify-between border border-gray-100"
             >
-              <div className="min-w-0">
+              {resource.photo?.imageBase64 && (
+                <Link href={`/resources/${resource.id}`} className="shrink-0 mr-3">
+                  <img
+                    src={`data:${resource.photo.mimeType};base64,${resource.photo.imageBase64}`}
+                    alt={resource.title}
+                    className="h-14 w-14 rounded-lg object-cover border border-gray-200"
+                  />
+                </Link>
+              )}
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-gray-800">{resource.title}</p>
                   {matchedResourceIdSet.has(resource.id) && (

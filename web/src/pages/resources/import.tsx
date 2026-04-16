@@ -79,7 +79,7 @@ export default function ResourceBulkImportPage() {
         return;
       }
 
-      setDrafts([result.draft]);
+      setDrafts([result.draft, ...(result.additionalDrafts ?? [])]);
       setSelected({});
     } catch (err) {
       setError((err as Error).message);
@@ -160,6 +160,7 @@ export default function ResourceBulkImportPage() {
                 <li>moderationVerdict: {photoDiagnostics.moderationVerdict}</li>
                 <li>relevanceVerdict: {photoDiagnostics.relevanceVerdict}</li>
                 <li>extractedTextPreview: {photoDiagnostics.extractedTextPreview || '(none)'}</li>
+                <li>detectionsCount: {photoDiagnostics.detectionsCount ?? 0}</li>
               </ul>
             </div>
           )}
