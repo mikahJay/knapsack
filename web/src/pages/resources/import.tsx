@@ -1,21 +1,27 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
-import { commitResourceImport, previewResourceImport, ResourceImportDraft } from '../../lib/api';
+import {
+  commitResourceImport,
+  PhotoImportDiagnostics,
+  previewResourceImport,
+  previewResourcePhotoImport,
+  ResourceImportDraft,
+} from '../../lib/api';
 
-const DEFAULT_INPUT_MAX_CHARS = 400000;
+const INPUT_MAX_CHARS = 1000;
 
 export default function ResourceBulkImportPage() {
   const router = useRouter();
   const [text, setText] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [drafts, setDrafts] = useState<ResourceImportDraft[]>([]);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
-  const [inputMaxChars, setInputMaxChars] = useState(DEFAULT_INPUT_MAX_CHARS);
-  const [estimatedTokens, setEstimatedTokens] = useState<number | null>(null);
-  const [tokenLimit, setTokenLimit] = useState<number | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [loadingPhotoPreview, setLoadingPhotoPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoDiagnostics, setPhotoDiagnostics] = useState<PhotoImportDiagnostics | null>(null);
 
   function toggleSelect(index: number) {
     setSelected((prev) => ({ ...prev, [index]: !prev[index] }));
@@ -50,13 +56,35 @@ export default function ResourceBulkImportPage() {
       const preview = await previewResourceImport(text);
       setDrafts(preview.items);
       setSelected({});
-      setEstimatedTokens(preview.estimatedTokens);
-      setTokenLimit(preview.inputTokenLimit);
-      setInputMaxChars(preview.inputMaxChars);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoadingPreview(false);
+    }
+  }
+
+  async function handlePhotoPreview() {
+    if (!photoFile) {
+      setError('Please choose a photo first.');
+      return;
+    }
+
+    setLoadingPhotoPreview(true);
+    setError(null);
+    try {
+      const result = await previewResourcePhotoImport(photoFile);
+      setPhotoDiagnostics(result.diagnostics ?? null);
+      if (result.status === 'reject') {
+        setError(`Photo rejected (${result.code}).`);
+        return;
+      }
+
+      setDrafts([result.draft]);
+      setSelected({});
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoadingPhotoPreview(false);
     }
   }
 
@@ -100,6 +128,44 @@ export default function ResourceBulkImportPage() {
         {error && <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</div>}
 
         <div className="bg-white border border-gray-100 rounded-xl p-4 mb-6">
+          <label htmlFor="bulk-resource-photo" className="block text-sm font-semibold text-gray-700 mb-2">
+            Or upload a photo
+          </label>
+          <input
+            id="bulk-resource-photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+          <div className="mt-3 mb-5 flex gap-2">
+            <button
+              type="button"
+              disabled={loadingPhotoPreview || !photoFile}
+              onClick={() => void handlePhotoPreview()}
+              className="bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {loadingPhotoPreview ? 'Analyzing Photo…' : 'Preview From Photo'}
+            </button>
+          </div>
+
+          {photoDiagnostics && (
+            <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+              <p className="font-semibold mb-2">Photo diagnostics (non-prod)</p>
+              <ul className="space-y-1">
+                <li>provider: {photoDiagnostics.provider}</li>
+                <li>model: {photoDiagnostics.model}</li>
+                <li>usedVision: {String(photoDiagnostics.usedVision)}</li>
+                <li>latencyMs: {photoDiagnostics.latencyMs}</li>
+                <li>moderationVerdict: {photoDiagnostics.moderationVerdict}</li>
+                <li>relevanceVerdict: {photoDiagnostics.relevanceVerdict}</li>
+                <li>extractedTextPreview: {photoDiagnostics.extractedTextPreview || '(none)'}</li>
+              </ul>
+            </div>
+          )}
+
+          <div className="h-px bg-gray-100 mb-5" />
+
           <label htmlFor="bulk-resource-text" className="block text-sm font-semibold text-gray-700 mb-2">
             Source text
           </label>
@@ -108,17 +174,12 @@ export default function ResourceBulkImportPage() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={8}
-            maxLength={inputMaxChars}
+            maxLength={INPUT_MAX_CHARS}
             placeholder="Example: We have 20 folding chairs, 1 projector, and two vans available next week..."
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
           <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-            <span>{text.length.toLocaleString()} / {inputMaxChars.toLocaleString()} characters</span>
-            <span>
-              {estimatedTokens !== null && tokenLimit !== null
-                ? `${estimatedTokens.toLocaleString()} / ${tokenLimit.toLocaleString()} est. tokens`
-                : 'Token guard: roughly half of the configured lowest model limit'}
-            </span>
+            <span>{text.length.toLocaleString()} / {INPUT_MAX_CHARS.toLocaleString()} characters</span>
           </div>
           <div className="mt-3 flex gap-2">
             <button

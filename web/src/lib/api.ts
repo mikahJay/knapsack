@@ -61,6 +61,39 @@ export interface ResourceImportDraft {
   available_until: string | null;
 }
 
+export type PhotoImportReasonCode =
+  | 'UNSUPPORTED_MIME'
+  | 'FILE_TOO_LARGE'
+  | 'DIMENSIONS_TOO_SMALL'
+  | 'MODERATION_UNSAFE'
+  | 'MODERATION_AMBIGUOUS'
+  | 'TEXT_POLICY_VIOLATION'
+  | 'NOT_A_RESOURCE_IMAGE'
+  | 'INTERNAL_ERROR';
+
+export interface PhotoImportDiagnostics {
+  provider: 'claude' | 'stub';
+  model: string;
+  usedVision: boolean;
+  latencyMs: number;
+  moderationVerdict: 'safe' | 'unsafe' | 'ambiguous';
+  relevanceVerdict: 'resource' | 'not_resource';
+  extractedTextPreview: string;
+}
+
+export type ResourcePhotoPreviewResponse =
+  | {
+      status: 'allow';
+      draft: ResourceImportDraft & { evidence_status: 'photo_attached' };
+      diagnostics?: PhotoImportDiagnostics;
+    }
+  | {
+      status: 'reject';
+      code: PhotoImportReasonCode;
+      message: string;
+      diagnostics?: PhotoImportDiagnostics;
+    };
+
 export interface ImportPreviewResponse<T> {
   items: T[];
   estimatedTokens: number;
@@ -153,6 +186,22 @@ export const commitResourceImport = (items: ResourceImportDraft[]) =>
     method: 'POST',
     body: JSON.stringify({ items }),
   });
+export const previewResourcePhotoImport = async (photo: File): Promise<ResourcePhotoPreviewResponse> => {
+  const form = new FormData();
+  form.append('photo', photo);
+
+  const res = await fetch(`${API_URL}/api/resources/import/photo/preview`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  });
+
+  const payload = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok && (payload?.status !== 'reject')) {
+    throw new Error((payload as { error?: string }).error ?? res.statusText);
+  }
+  return payload as ResourcePhotoPreviewResponse;
+};
 
 // ── Matches ───────────────────────────────────────────────────
 export const listMatches = (filters?: { needId?: string; resourceId?: string; unseenOnly?: boolean }) => {

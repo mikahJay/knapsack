@@ -50,6 +50,7 @@ const mockCreateResource = jest.fn();
 const mockGetOneResource = jest.fn();
 const mockUpdateResource = jest.fn();
 const mockPreviewResourceImport = jest.fn();
+const mockPreviewResourcePhotoImport = jest.fn();
 const mockCommitResourceImport = jest.fn();
 const mockListMatches = jest.fn();
 const mockGetUnseenMatchesCount = jest.fn();
@@ -111,6 +112,7 @@ jest.mock('./lib/api', () => ({
   getOneResource: (...args: unknown[]) => mockGetOneResource(...args),
   updateResource: (...args: unknown[]) => mockUpdateResource(...args),
   previewResourceImport: (...args: unknown[]) => mockPreviewResourceImport(...args),
+  previewResourcePhotoImport: (...args: unknown[]) => mockPreviewResourcePhotoImport(...args),
   commitResourceImport: (...args: unknown[]) => mockCommitResourceImport(...args),
   listMatches: (...args: unknown[]) => mockListMatches(...args),
   getUnseenMatchesCount: (...args: unknown[]) => mockGetUnseenMatchesCount(...args),
@@ -149,7 +151,28 @@ beforeEach(() => {
   mockGetUnseenMatchesCount.mockResolvedValue({ count: 0 });
   mockMarkMatchesSeen.mockResolvedValue({ ok: true, marked: 0 });
   mockPreviewNeedImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
-  mockPreviewResourceImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
+  mockPreviewResourceImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 1000 });
+  mockPreviewResourcePhotoImport.mockResolvedValue({
+    status: 'allow',
+    draft: {
+      title: 'Photo resource draft',
+      description: null,
+      quantity: 1,
+      status: 'available',
+      is_public: false,
+      available_until: null,
+      evidence_status: 'photo_attached',
+    },
+    diagnostics: {
+      provider: 'claude',
+      model: 'claude-3-haiku-20240307',
+      usedVision: true,
+      latencyMs: 123,
+      moderationVerdict: 'safe',
+      relevanceVerdict: 'resource',
+      extractedTextPreview: 'wireless mouse',
+    },
+  });
   mockCommitNeedImport.mockResolvedValue([]);
   mockCommitResourceImport.mockResolvedValue([]);
 });
@@ -478,7 +501,7 @@ describe('ResourceBulkImportPage', () => {
       items: [{ title: 'Projector', description: 'HD projector', quantity: 1, status: 'available', is_public: true, available_until: null }],
       estimatedTokens: 20,
       inputTokenLimit: 100000,
-      inputMaxChars: 400000,
+      inputMaxChars: 1000,
     });
 
     renderWithUser(<ResourceBulkImportPage />);
@@ -489,6 +512,22 @@ describe('ResourceBulkImportPage', () => {
     await waitFor(() => expect(screen.getByDisplayValue('Projector')).toBeInTheDocument());
     await userEvent.click(screen.getByText('Import 1 Resources'));
     await waitFor(() => expect(mockCommitResourceImport).toHaveBeenCalled());
+  });
+
+  it('previews resource drafts from uploaded photo', async () => {
+    routerState.pathname = '/resources/import';
+    renderWithUser(<ResourceBulkImportPage />);
+    await waitFor(() => expect(screen.getByText('Bulk Import Resources')).toBeInTheDocument());
+
+    const input = screen.getByLabelText(/Or upload a photo/i) as HTMLInputElement;
+    const file = new File(['fake-image-bytes'], 'resource.jpg', { type: 'image/jpeg' });
+    await userEvent.upload(input, file);
+    await userEvent.click(screen.getByText('Preview From Photo'));
+
+    await waitFor(() => expect(mockPreviewResourcePhotoImport).toHaveBeenCalled());
+    expect(screen.getByDisplayValue('Photo resource draft')).toBeInTheDocument();
+    expect(screen.getByText(/Photo diagnostics \(non-prod\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/provider: claude/i)).toBeInTheDocument();
   });
 });
 
@@ -696,6 +735,15 @@ describe('lib/api helpers', () => {
     await api.previewResourceImport('have tents and blankets');
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/resources/import/preview'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('previewResourcePhotoImport posts multipart form data', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ status: 'allow', draft: { title: 'Photo resource draft' } }));
+    await api.previewResourcePhotoImport(new File(['fake-image-bytes'], 'resource.jpg', { type: 'image/jpeg' }));
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/resources/import/photo/preview'),
       expect.objectContaining({ method: 'POST' })
     );
   });

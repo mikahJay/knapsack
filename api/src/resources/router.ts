@@ -1,9 +1,17 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import { imageSize } from 'image-size';
 import { query, queryOne, pool } from '../db';
 import { requireAuth } from '../auth/router';
 import { AppUser } from '../auth/passport';
 import type { UUID } from '../types';
 import { previewResourcesFromText, ImportResourceItem, ImportPreviewError } from '../import/claude';
+import {
+  PHOTO_IMPORT_ALLOWED_MIME_TYPES,
+  PHOTO_IMPORT_MAX_SIZE_BYTES,
+  httpStatusForPhotoImportResult,
+  previewResourcePhotoImport,
+} from '../import/moderation';
 
 export interface Resource {
   id: UUID;
@@ -19,6 +27,18 @@ export interface Resource {
 }
 
 export const resourcesRouter = Router();
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: PHOTO_IMPORT_MAX_SIZE_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(file.mimetype as (typeof PHOTO_IMPORT_ALLOWED_MIME_TYPES)[number])) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Unsupported file type'));
+  },
+});
 
 // All routes require authentication
 resourcesRouter.use(requireAuth);
@@ -79,6 +99,67 @@ resourcesRouter.post('/import/preview', async (req: Request, res: Response, next
     if (err instanceof ImportPreviewError) {
       return res.status(err.status).json({ error: err.message });
     }
+    next(err);
+  }
+});
+
+// POST /api/resources/import/photo/preview — evaluate a photo before parsing
+resourcesRouter.post('/import/photo/preview', async (req: Request, res: Response, next: NextFunction) => {
+  if (req.is('multipart/form-data')) {
+    return photoUpload.single('photo')(req, res, async (uploadErr: unknown) => {
+      if (uploadErr) {
+        const message = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
+        return res.status(400).json({ status: 'reject', code: 'UNSUPPORTED_MIME', message });
+      }
+
+      try {
+        const file = req.file;
+        if (!file) return res.status(400).json({ error: 'photo file is required' });
+
+        const dims = imageSize(file.buffer);
+        const width = typeof dims.width === 'number' ? dims.width : 0;
+        const height = typeof dims.height === 'number' ? dims.height : 0;
+
+        const preview = await previewResourcePhotoImport({
+          mimeType: file.mimetype,
+          sizeBytes: file.size,
+          width,
+          height,
+          fileName: file.originalname,
+          imageBase64: file.buffer.toString('base64'),
+        });
+
+        res.status(httpStatusForPhotoImportResult(preview)).json(preview);
+      } catch (err) {
+        next(err);
+      }
+    });
+  }
+
+  try {
+    const file = req.body?.file as {
+      mimeType?: string;
+      sizeBytes?: number;
+      width?: number;
+      height?: number;
+      fileName?: string | null;
+      imageBase64?: string | null;
+    } | undefined;
+    if (!file || typeof file.mimeType !== 'string') {
+      return res.status(400).json({ error: 'file metadata is required' });
+    }
+
+    const preview = await previewResourcePhotoImport({
+      mimeType: file.mimeType,
+      sizeBytes: Number(file.sizeBytes),
+      width: Number(file.width),
+      height: Number(file.height),
+      fileName: typeof file.fileName === 'string' ? file.fileName : null,
+      imageBase64: typeof file.imageBase64 === 'string' ? file.imageBase64 : null,
+    });
+
+    res.status(httpStatusForPhotoImportResult(preview)).json(preview);
+  } catch (err) {
     next(err);
   }
 });
