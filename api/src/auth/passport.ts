@@ -35,7 +35,19 @@ export async function upsertBypassUser(): Promise<AppUser> {
     'SELECT id, email, name, provider, is_admin FROM auth.users WHERE email = $1',
     ['bob@local.dev']
   );
-  if (existing) return existing;
+  if (existing) {
+    if (existing.is_admin) return existing;
+
+    const elevated = await queryOne<AppUser>(
+      `UPDATE auth.users
+       SET is_admin = true
+       WHERE id = $1
+       RETURNING id, email, name, provider, is_admin`,
+      [existing.id]
+    );
+
+    return elevated ?? { ...existing, is_admin: true };
+  }
 
   const [created] = await query<AppUser>(
     `INSERT INTO auth.users (email, name, provider, is_admin)

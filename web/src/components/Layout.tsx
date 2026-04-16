@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ReactNode, useEffect, useState } from 'react';
-import { getMe, logout, User } from '../lib/api';
+import { getMe, getUnseenMatchesCount, logout, User } from '../lib/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -10,16 +10,39 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [matchCount, setMatchCount] = useState(0);
+
+  async function refreshUnseenCount() {
+    try {
+      const payload = await getUnseenMatchesCount();
+      setMatchCount(payload.count);
+    } catch {
+      setMatchCount(0);
+    }
+  }
 
   useEffect(() => {
+    const handleRefresh = () => {
+      void refreshUnseenCount();
+    };
+
     getMe()
-      .then(setUser)
+      .then(async (currentUser) => {
+        setUser(currentUser);
+        await refreshUnseenCount();
+      })
       .catch(() => router.push('/login'));
+
+    window.addEventListener('matches:refresh-unseen', handleRefresh);
+    return () => {
+      window.removeEventListener('matches:refresh-unseen', handleRefresh);
+    };
   }, [router]);
 
   async function handleLogout() {
     await logout();
     setUser(null);
+    setMatchCount(0);
     router.push('/login');
   }
 
@@ -39,6 +62,18 @@ export default function Layout({ children }: LayoutProps) {
             </Link>
             <Link href="/resources" className="hover:text-indigo-600">
               Resources
+            </Link>
+            <Link
+              href="/matches"
+              aria-label={matchCount > 0 ? `Matches (${matchCount})` : 'Matches'}
+              className="hover:text-indigo-600 inline-flex items-center gap-2"
+            >
+              <span>Matches</span>
+              {matchCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-700">
+                  {matchCount}
+                </span>
+              )}
             </Link>
             {user.is_admin && (
               <Link href="/admin" className="hover:text-indigo-600">
