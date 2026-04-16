@@ -27,6 +27,28 @@ export interface UploadedPhotoMetadata {
   imageBase64?: string | null;
 }
 
+export interface ResourcePhotoBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ResourcePhotoDetection {
+  label: string;
+  confidence: number;
+  box: ResourcePhotoBoundingBox;
+}
+
+export interface ResourcePhotoAttachment {
+  mimeType: string;
+  imageBase64: string;
+  width: number;
+  height: number;
+  focusBox: ResourcePhotoBoundingBox | null;
+  detections: ResourcePhotoDetection[];
+}
+
 export interface PhotoImportPolicyInput extends UploadedPhotoMetadata {
   moderationVerdict: PhotoModerationVerdict;
   relevanceVerdict: ResourcePhotoVerdict;
@@ -41,6 +63,18 @@ export interface ResourcePhotoDraftPreview {
   is_public: false;
   available_until: string | null;
   evidence_status: 'photo_attached';
+  photo?: ResourcePhotoAttachment;
+}
+
+export interface PhotoImportDiagnostics {
+  provider: 'claude' | 'stub';
+  model: string;
+  usedVision: boolean;
+  latencyMs: number;
+  moderationVerdict: PhotoModerationVerdict;
+  relevanceVerdict: ResourcePhotoVerdict;
+  extractedTextPreview: string;
+  detectionsCount?: number;
 }
 
 export interface PhotoImportRejectResult {
@@ -53,17 +87,8 @@ export interface PhotoImportRejectResult {
 export interface PhotoImportAllowResult {
   status: 'allow';
   draft: ResourcePhotoDraftPreview;
+  additionalDrafts?: ResourcePhotoDraftPreview[];
   diagnostics?: PhotoImportDiagnostics;
-}
-
-export interface PhotoImportDiagnostics {
-  provider: 'claude' | 'stub';
-  model: string;
-  usedVision: boolean;
-  latencyMs: number;
-  moderationVerdict: PhotoModerationVerdict;
-  relevanceVerdict: ResourcePhotoVerdict;
-  extractedTextPreview: string;
 }
 
 export type PhotoImportPolicyResult = PhotoImportRejectResult | PhotoImportAllowResult;
@@ -79,7 +104,7 @@ interface PhotoAnalysisResult {
   moderationVerdict: PhotoModerationVerdict;
   relevanceVerdict: ResourcePhotoVerdict;
   extractedText: string;
-  draft: ResourcePhotoDraftPreview;
+  drafts: ResourcePhotoDraftPreview[];
   diagnostics: PhotoImportDiagnostics;
 }
 
@@ -108,7 +133,44 @@ function containsPolicyText(text: string | null | undefined): boolean {
   return /(explicit|nude|nsfw|fetish|sexual|xxx)/i.test(text);
 }
 
-function normalizeDraft(raw: Record<string, unknown>): ResourcePhotoDraftPreview {
+function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+function normalizeBoundingBox(raw: Record<string, unknown> | undefined): ResourcePhotoBoundingBox | null {
+  if (!raw) return null;
+  const x = clamp01(Number(raw['x']));
+  const y = clamp01(Number(raw['y']));
+  const width = clamp01(Number(raw['width']));
+  const height = clamp01(Number(raw['height']));
+  if (width <= 0 || height <= 0) return null;
+  return { x, y, width, height };
+}
+
+function buildAttachment(
+  file: UploadedPhotoMetadata,
+  focusBox: ResourcePhotoBoundingBox | null,
+  detections: ResourcePhotoDetection[]
+): ResourcePhotoAttachment | undefined {
+  if (!file.imageBase64) return undefined;
+  return {
+    mimeType: file.mimeType,
+    imageBase64: file.imageBase64,
+    width: file.width,
+    height: file.height,
+    focusBox,
+    detections,
+  };
+}
+
+function normalizeDraft(
+  raw: Record<string, unknown>,
+  file: UploadedPhotoMetadata,
+  detections: ResourcePhotoDetection[]
+): ResourcePhotoDraftPreview {
   const title = typeof raw['title'] === 'string' && raw['title'].trim().length > 0
     ? raw['title'].trim()
     : 'Photo resource draft';
@@ -130,6 +192,10 @@ function normalizeDraft(raw: Record<string, unknown>): ResourcePhotoDraftPreview
     ? raw['available_until'].trim()
     : null;
 
+  const focusBox = normalizeBoundingBox(
+    raw['bbox'] && typeof raw['bbox'] === 'object' ? (raw['bbox'] as Record<string, unknown>) : undefined
+  );
+
   return {
     title,
     description,
@@ -138,6 +204,7 @@ function normalizeDraft(raw: Record<string, unknown>): ResourcePhotoDraftPreview
     is_public: false,
     available_until: availableUntil,
     evidence_status: 'photo_attached',
+    photo: buildAttachment(file, focusBox, detections),
   };
 }
 
@@ -161,6 +228,23 @@ function extractJson(text: string): unknown {
   }
 }
 
+function normalizeDetections(rawItems: unknown[]): ResourcePhotoDetection[] {
+  return rawItems
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => {
+      const box = normalizeBoundingBox(
+        item['bbox'] && typeof item['bbox'] === 'object'
+          ? (item['bbox'] as Record<string, unknown>)
+          : undefined
+      );
+      return {
+        label: typeof item['title'] === 'string' ? item['title'] : 'resource',
+        confidence: clamp01(Number(item['confidence'])),
+        box: box ?? { x: 0, y: 0, width: 1, height: 1 },
+      };
+    });
+}
+
 async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnalysisResult> {
   const started = Date.now();
   const model = process.env['CLAUDE_MODEL'] ?? 'claude-3-haiku-20240307';
@@ -170,7 +254,7 @@ async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnal
       moderationVerdict: 'safe',
       relevanceVerdict: 'resource',
       extractedText: '',
-      draft: buildDraftPreview(),
+      drafts: [buildDraftPreview()],
       diagnostics: {
         provider: 'stub',
         model,
@@ -179,6 +263,7 @@ async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnal
         moderationVerdict: 'safe',
         relevanceVerdict: 'resource',
         extractedTextPreview: '',
+        detectionsCount: 0,
       },
     };
   }
@@ -188,7 +273,7 @@ async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnal
       moderationVerdict: 'ambiguous',
       relevanceVerdict: 'not_resource',
       extractedText: '',
-      draft: buildDraftPreview(),
+      drafts: [buildDraftPreview()],
       diagnostics: {
         provider: 'stub',
         model,
@@ -197,6 +282,7 @@ async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnal
         moderationVerdict: 'ambiguous',
         relevanceVerdict: 'not_resource',
         extractedTextPreview: '',
+        detectionsCount: 0,
       },
     };
   }
@@ -217,27 +303,33 @@ Analyze the uploaded image and return ONLY valid JSON with this exact shape:
   "moderationVerdict": "safe" | "unsafe" | "ambiguous",
   "relevanceVerdict": "resource" | "not_resource",
   "extractedText": "string",
-  "draft": {
-    "title": "string",
-    "description": "string|null",
-    "quantity": number,
-    "status": "available" | "allocated" | "retired",
-    "available_until": "YYYY-MM-DD|null"
-  }
+  "items": [
+    {
+      "title": "string",
+      "description": "string|null",
+      "quantity": number,
+      "status": "available" | "allocated" | "retired",
+      "available_until": "YYYY-MM-DD|null",
+      "bbox": {"x": number, "y": number, "width": number, "height": number},
+      "confidence": number
+    }
+  ]
 }
 
 Rules:
 - Be conservative: when uncertain about safety, use "ambiguous".
 - If image is not clearly a resource/inventory style photo, use "not_resource".
+- Return one item per distinct resource visible; if multiple resources are visible, include each.
 - Keep title concise and specific (e.g., "Wireless Mouse", "Ceramic Coffee Mug").
 - Quantity should default to 1 unless clearly multiple items are visible.
+- bbox values must be normalized 0..1 and should tightly frame each item.
 - Extract visible text into extractedText if present, otherwise empty string.
 - Return JSON only, no markdown.`;
 
   const client = new Anthropic();
   const response = await client.messages.create({
     model,
-    max_tokens: 1024,
+    max_tokens: 1536,
     messages: [
       {
         role: 'user',
@@ -265,21 +357,23 @@ Rules:
     moderationVerdict?: unknown;
     relevanceVerdict?: unknown;
     extractedText?: unknown;
-    draft?: unknown;
+    items?: unknown;
   } | null;
 
   const moderationVerdict = normalizeModerationVerdict(parsed?.moderationVerdict);
   const relevanceVerdict = normalizeRelevanceVerdict(parsed?.relevanceVerdict);
   const extractedText = typeof parsed?.extractedText === 'string' ? parsed.extractedText : '';
-  const draft = parsed?.draft && typeof parsed.draft === 'object'
-    ? normalizeDraft(parsed.draft as Record<string, unknown>)
-    : buildDraftPreview();
+  const rawItems = Array.isArray(parsed?.items) ? parsed.items : [];
+  const detections = normalizeDetections(rawItems);
+  const drafts = rawItems
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => normalizeDraft(item, file, detections));
 
   return {
     moderationVerdict,
     relevanceVerdict,
     extractedText,
-    draft,
+    drafts: drafts.length > 0 ? drafts : [{ ...buildDraftPreview(), photo: buildAttachment(file, null, detections) }],
     diagnostics: {
       provider: 'claude',
       model,
@@ -288,6 +382,7 @@ Rules:
       moderationVerdict,
       relevanceVerdict,
       extractedTextPreview: extractedText.slice(0, 160),
+      detectionsCount: drafts.length,
     },
   };
 }
@@ -366,9 +461,11 @@ export async function previewResourcePhotoImport(file: UploadedPhotoMetadata): P
     });
 
     if (decision.status === 'allow') {
+      const [draft, ...additionalDrafts] = analysis.drafts;
       return {
         status: 'allow',
-        draft: analysis.draft,
+        draft: draft ?? buildDraftPreview(),
+        ...(additionalDrafts.length > 0 ? { additionalDrafts } : {}),
         ...(config.isProd ? {} : { diagnostics: analysis.diagnostics }),
       };
     }
@@ -376,7 +473,7 @@ export async function previewResourcePhotoImport(file: UploadedPhotoMetadata): P
     return {
       ...decision,
       ...(config.isProd ? {} : { diagnostics: analysis.diagnostics }),
-    } as PhotoImportPolicyResult;
+    };
   }
 
   const moderationVerdict = await activePhotoImportServices.getModerationVerdict(file);
@@ -397,6 +494,7 @@ export async function previewResourcePhotoImport(file: UploadedPhotoMetadata): P
     moderationVerdict,
     relevanceVerdict,
     extractedTextPreview: extractedText.slice(0, 160),
+    detectionsCount: 0,
   };
 
   if (fallbackDecision.status === 'allow') {

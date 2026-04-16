@@ -10,6 +10,7 @@ import {
   PHOTO_IMPORT_ALLOWED_MIME_TYPES,
   PHOTO_IMPORT_MAX_SIZE_BYTES,
   httpStatusForPhotoImportResult,
+  ResourcePhotoAttachment,
   previewResourcePhotoImport,
 } from '../import/moderation';
 
@@ -24,6 +25,17 @@ export interface Resource {
   owner_id: UUID | null;
   created_at: string;
   updated_at: string;
+  photo?: ResourcePhotoAttachment | null;
+}
+
+interface ImportResourceCommitItem {
+  title: string;
+  description?: string | null;
+  quantity?: number;
+  status?: string;
+  is_public?: boolean;
+  available_until?: string | null;
+  photo?: ResourcePhotoAttachment;
 }
 
 export const resourcesRouter = Router();
@@ -48,10 +60,24 @@ resourcesRouter.get('/', async (req: Request, res: Response, next: NextFunction)
   try {
     const userId = (req.user as AppUser).id;
     const resources = await query<Resource>(
-      `SELECT * FROM resource.resources
-       WHERE replaced_by_id IS NULL
-         AND (owner_id = $1 OR is_public = true)
-       ORDER BY created_at DESC`,
+      `SELECT
+         r.*,
+         CASE
+           WHEN p.resource_id IS NULL THEN NULL
+           ELSE json_build_object(
+             'mimeType', p.mime_type,
+             'imageBase64', p.image_base64,
+             'width', p.image_width,
+             'height', p.image_height,
+             'focusBox', p.focus_box,
+             'detections', p.detections
+           )
+         END AS photo
+       FROM resource.resources r
+       LEFT JOIN resource.resource_photos p ON p.resource_id = r.id
+       WHERE r.replaced_by_id IS NULL
+         AND (r.owner_id = $1 OR r.is_public = true)
+       ORDER BY r.created_at DESC`,
       [userId]
     );
     res.json(resources);
@@ -172,7 +198,7 @@ resourcesRouter.post('/import/commit', async (req: Request, res: Response, next:
     if (raw.length === 0) return res.json([]);
 
     const userId = (req.user as AppUser).id;
-    const items = raw as ImportResourceItem[];
+    const items = raw as ImportResourceCommitItem[];
     const client = await pool.connect();
 
     try {
@@ -185,7 +211,10 @@ resourcesRouter.post('/import/commit', async (req: Request, res: Response, next:
         const quantity = Number.isFinite(Number(item.quantity)) && Number(item.quantity) >= 1
           ? Math.floor(Number(item.quantity))
           : 1;
-        const status = ['available', 'allocated', 'retired'].includes(item.status) ? item.status : 'available';
+        const statusCandidate = typeof item.status === 'string' ? item.status : 'available';
+        const status = ['available', 'allocated', 'retired'].includes(statusCandidate)
+          ? statusCandidate
+          : 'available';
 
         const inserted = await client.query<Resource>(
           `INSERT INTO resource.resources (title, description, status, is_public, quantity, available_until, owner_id)
@@ -202,6 +231,32 @@ resourcesRouter.post('/import/commit', async (req: Request, res: Response, next:
           ]
         );
         if (inserted.rows[0]) created.push(inserted.rows[0]);
+
+        const createdRow = inserted.rows[0];
+        if (createdRow && item.photo?.imageBase64) {
+          await client.query(
+            `INSERT INTO resource.resource_photos
+              (resource_id, mime_type, image_base64, image_width, image_height, focus_box, detections)
+             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+             ON CONFLICT (resource_id)
+             DO UPDATE SET
+               mime_type = EXCLUDED.mime_type,
+               image_base64 = EXCLUDED.image_base64,
+               image_width = EXCLUDED.image_width,
+               image_height = EXCLUDED.image_height,
+               focus_box = EXCLUDED.focus_box,
+               detections = EXCLUDED.detections`,
+            [
+              createdRow.id,
+              item.photo.mimeType,
+              item.photo.imageBase64,
+              item.photo.width,
+              item.photo.height,
+              JSON.stringify(item.photo.focusBox ?? null),
+              JSON.stringify(item.photo.detections ?? []),
+            ]
+          );
+        }
       }
       await client.query('COMMIT');
       res.status(201).json(created);
@@ -221,10 +276,24 @@ resourcesRouter.get('/:id', async (req: Request, res: Response, next: NextFuncti
   try {
     const userId = (req.user as AppUser).id;
     const resource = await queryOne<Resource>(
-      `SELECT * FROM resource.resources
-       WHERE id = $1
-         AND replaced_by_id IS NULL
-         AND (owner_id = $2 OR is_public = true)`,
+      `SELECT
+         r.*,
+         CASE
+           WHEN p.resource_id IS NULL THEN NULL
+           ELSE json_build_object(
+             'mimeType', p.mime_type,
+             'imageBase64', p.image_base64,
+             'width', p.image_width,
+             'height', p.image_height,
+             'focusBox', p.focus_box,
+             'detections', p.detections
+           )
+         END AS photo
+       FROM resource.resources r
+       LEFT JOIN resource.resource_photos p ON p.resource_id = r.id
+       WHERE r.id = $1
+         AND r.replaced_by_id IS NULL
+         AND (r.owner_id = $2 OR r.is_public = true)`,
       [req.params['id'], userId]
     );
     if (!resource) return res.status(404).json({ error: 'Not found' });
@@ -306,6 +375,17 @@ resourcesRouter.put('/:id', async (req: Request, res: Response, next: NextFuncti
 
       const nextResource = inserted.rows[0];
       if (!nextResource) throw new Error('Failed to create new resource version');
+
+      await client.query(
+        `INSERT INTO resource.resource_photos
+          (resource_id, mime_type, image_base64, image_width, image_height, focus_box, detections)
+         SELECT $1, mime_type, image_base64, image_width, image_height, focus_box, detections
+         FROM resource.resource_photos
+         WHERE resource_id = $2
+         ON CONFLICT (resource_id)
+         DO NOTHING`,
+        [nextResource.id, req.params['id']]
+      );
 
       await client.query(
         `UPDATE resource.resources

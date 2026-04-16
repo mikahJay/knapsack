@@ -15,17 +15,17 @@ import { matchesRouter } from './matches/router';
 export function createApp(): express.Application {
   const app = express();
 
-  // ── Body / cookies ──────────────────────────────────────────
-  app.use(express.json());
-  app.use(cookieParser());
-
-  // ── CORS (allow web frontend) ───────────────────────────────
+  // ── CORS (must be first so headers are present on error responses) ──────────
   app.use(
     cors({
       origin: config.webUrl,
       credentials: true,
     })
   );
+
+  // ── Body / cookies ──────────────────────────────────────────
+  app.use(express.json({ limit: '20mb' }));
+  app.use(cookieParser());
 
   // ── Sessions backed by Postgres ─────────────────────────────
   const PgSession = connectPgSimple(session);
