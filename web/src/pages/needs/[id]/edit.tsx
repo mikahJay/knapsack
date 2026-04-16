@@ -1,37 +1,58 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
-import Layout from '../../components/Layout';
-import { createResource } from '../../lib/api';
+import Layout from '../../../components/Layout';
+import { getOnNeed, updateNeed } from '../../../lib/api';
 
-export default function NewResourcePage() {
+export default function EditNeedPage() {
   const router = useRouter();
+  const { id } = router.query;
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [availableUntil, setAvailableUntil] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
-  });
+  const [neededBy, setNeededBy] = useState('');
   const [isPublic, setIsPublic] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState('open');
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id || typeof id !== 'string') return;
+    setLoading(true);
+    getOnNeed(id)
+      .then((need) => {
+        setTitle(need.title);
+        setDescription(need.description ?? '');
+        setQuantity(need.quantity);
+        setNeededBy(need.needed_by ? new Date(need.needed_by).toISOString().slice(0, 10) : '');
+        setIsPublic(need.is_public);
+        setStatus(need.status);
+      })
+      .catch((err) => setError((err as Error).message))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setError('Title is required.'); return; }
+    if (!id || typeof id !== 'string') return;
+    if (!title.trim()) {
+      setError('Title is required.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await createResource({
+      const updated = await updateNeed(id, {
         title: title.trim(),
         description: description.trim() || undefined,
         quantity,
-        available_until: availableUntil || undefined,
+        needed_by: neededBy || null,
         is_public: isPublic,
+        status,
       });
-      router.push('/resources');
+      router.push(`/needs/${updated.id}`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -39,18 +60,18 @@ export default function NewResourcePage() {
     }
   }
 
+  if (loading) {
+    return (
+      <Layout>
+        <p className="text-gray-400">Loading…</p>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="max-w-lg">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-gray-800">New Resource</h1>
-          <Link
-            href="/resources/import"
-            className="border border-indigo-200 text-indigo-700 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition"
-          >
-            Bulk Import
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Edit Need</h1>
         {error && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</div>
         )}
@@ -83,20 +104,33 @@ export default function NewResourcePage() {
                 type="number"
                 min={1}
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
             <div>
-              <label htmlFor="available_until" className="block text-sm font-medium text-gray-700 mb-1">Available until</label>
+              <label htmlFor="needed_by" className="block text-sm font-medium text-gray-700 mb-1">Needed by</label>
               <input
-                id="available_until"
+                id="needed_by"
                 type="date"
-                value={availableUntil}
-                onChange={(e) => setAvailableUntil(e.target.value)}
+                value={neededBy}
+                onChange={(e) => setNeededBy(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
+          </div>
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              <option value="open">open</option>
+              <option value="fulfilled">fulfilled</option>
+              <option value="closed">closed</option>
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -116,11 +150,11 @@ export default function NewResourcePage() {
               disabled={saving}
               className="bg-indigo-600 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
             >
-              {saving ? 'Saving…' : 'Create'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
-              onClick={() => router.push('/resources')}
+              onClick={() => router.push(typeof id === 'string' ? `/needs/${id}` : '/needs')}
               className="text-sm font-medium text-gray-500 hover:text-gray-700"
             >
               Cancel

@@ -40,14 +40,23 @@ const mockDeleteNeed = jest.fn();
 const mockSearchNeeds = jest.fn();
 const mockCreateNeed = jest.fn();
 const mockGetOnNeed = jest.fn();
+const mockUpdateNeed = jest.fn();
+const mockPreviewNeedImport = jest.fn();
+const mockCommitNeedImport = jest.fn();
 const mockListResources = jest.fn();
 const mockDeleteResource = jest.fn();
 const mockSearchResources = jest.fn();
 const mockCreateResource = jest.fn();
 const mockGetOneResource = jest.fn();
+const mockUpdateResource = jest.fn();
+const mockPreviewResourceImport = jest.fn();
+const mockCommitResourceImport = jest.fn();
+const mockListMatches = jest.fn();
+const mockGetUnseenMatchesCount = jest.fn();
+const mockMarkMatchesSeen = jest.fn();
 const mockLogout = jest.fn();
 
-const BOB = { id: 'bob-uuid', email: 'bob@example.com', name: 'Bob', provider: 'local' };
+const BOB = { id: 'bob-uuid', email: 'bob@example.com', name: 'Bob', provider: 'local', is_admin: false };
 const NEED_1: import('./lib/api').Need = {
   id: 'n1', title: 'Need Alpha', description: 'A need', status: 'open',
   is_public: true, quantity: 1, needed_by: null, owner_id: 'bob-uuid',
@@ -63,6 +72,27 @@ const RESOURCE_1: import('./lib/api').Resource = {
   is_public: true, quantity: 3, available_until: null, owner_id: 'bob-uuid',
   created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
 };
+const MATCH_1: import('./lib/api').Match = {
+  id: 'm1',
+  need_id: 'n1',
+  resource_id: 'r1',
+  score: 0.95,
+  rationale: 'Strong fit',
+  strategy: 'claude',
+  matched_at: '2026-04-15T12:00:00Z',
+  need_title: 'Need Alpha',
+  need_status: 'open',
+  need_owner_id: 'bob-uuid',
+  resource_title: 'Resource Alpha',
+  resource_status: 'available',
+  resource_owner_id: 'bob-uuid',
+  seen_at: null,
+};
+const MATCH_2_SEEN: import('./lib/api').Match = {
+  ...MATCH_1,
+  id: 'm2',
+  seen_at: '2026-04-15T12:30:00Z',
+};
 
 jest.mock('./lib/api', () => ({
   getMe: (...args: unknown[]) => mockGetMe(...args),
@@ -71,11 +101,20 @@ jest.mock('./lib/api', () => ({
   searchNeeds: (...args: unknown[]) => mockSearchNeeds(...args),
   createNeed: (...args: unknown[]) => mockCreateNeed(...args),
   getOnNeed: (...args: unknown[]) => mockGetOnNeed(...args),
+  updateNeed: (...args: unknown[]) => mockUpdateNeed(...args),
+  previewNeedImport: (...args: unknown[]) => mockPreviewNeedImport(...args),
+  commitNeedImport: (...args: unknown[]) => mockCommitNeedImport(...args),
   listResources: (...args: unknown[]) => mockListResources(...args),
   deleteResource: (...args: unknown[]) => mockDeleteResource(...args),
   searchResources: (...args: unknown[]) => mockSearchResources(...args),
   createResource: (...args: unknown[]) => mockCreateResource(...args),
   getOneResource: (...args: unknown[]) => mockGetOneResource(...args),
+  updateResource: (...args: unknown[]) => mockUpdateResource(...args),
+  previewResourceImport: (...args: unknown[]) => mockPreviewResourceImport(...args),
+  commitResourceImport: (...args: unknown[]) => mockCommitResourceImport(...args),
+  listMatches: (...args: unknown[]) => mockListMatches(...args),
+  getUnseenMatchesCount: (...args: unknown[]) => mockGetUnseenMatchesCount(...args),
+  markMatchesSeen: (...args: unknown[]) => mockMarkMatchesSeen(...args),
   logout: (...args: unknown[]) => mockLogout(...args),
 }));
 
@@ -85,10 +124,15 @@ import HomePage from './pages/index';
 import LoginPage from './pages/login';
 import NeedsPage from './pages/needs/index';
 import NewNeedPage from './pages/needs/new';
+import NeedBulkImportPage from './pages/needs/import';
 import NeedDetailPage from './pages/needs/[id]';
+import EditNeedPage from './pages/needs/[id]/edit';
 import ResourcesPage from './pages/resources/index';
 import NewResourcePage from './pages/resources/new';
+import ResourceBulkImportPage from './pages/resources/import';
 import ResourceDetailPage from './pages/resources/[id]';
+import EditResourcePage from './pages/resources/[id]/edit';
+import MatchesPage from './pages/matches/index';
 
 // ── Helpers ───────────────────────────────────────────────────
 function renderWithUser(component: React.ReactElement) {
@@ -101,6 +145,13 @@ beforeEach(() => {
   routerState.query = {};
   routerState.pathname = '/';
   mockGetMe.mockResolvedValue(BOB);
+  mockListMatches.mockResolvedValue([]);
+  mockGetUnseenMatchesCount.mockResolvedValue({ count: 0 });
+  mockMarkMatchesSeen.mockResolvedValue({ ok: true, marked: 0 });
+  mockPreviewNeedImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
+  mockPreviewResourceImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
+  mockCommitNeedImport.mockResolvedValue([]);
+  mockCommitResourceImport.mockResolvedValue([]);
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -113,7 +164,21 @@ describe('Layout', () => {
     expect(screen.getByText('knapsack')).toBeInTheDocument();
     expect(screen.getByText('Needs')).toBeInTheDocument();
     expect(screen.getByText('Resources')).toBeInTheDocument();
+    expect(screen.getByText('Matches')).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
+  });
+
+  it('shows a notification bubble when matches exist', async () => {
+    mockGetUnseenMatchesCount.mockResolvedValueOnce({ count: 1 });
+    renderWithUser(<Layout><p>x</p></Layout>);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Matches (1)' })).toBeInTheDocument());
+  });
+
+  it('hides bubble when unseen count is zero', async () => {
+    mockGetUnseenMatchesCount.mockResolvedValueOnce({ count: 0 });
+    renderWithUser(<Layout><p>x</p></Layout>);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Matches' })).toBeInTheDocument());
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
   it('shows email when name is null', async () => {
@@ -179,6 +244,13 @@ describe('NeedsPage', () => {
     renderWithUser(<NeedsPage />);
     await waitFor(() => expect(screen.getByText('Need Alpha')).toBeInTheDocument());
     expect(screen.getByText('Need Beta')).toBeInTheDocument();
+  });
+
+  it('shows a Matched! link for owned matched needs', async () => {
+    mockListMatches.mockResolvedValue([MATCH_1]);
+    renderWithUser(<NeedsPage />);
+    await waitFor(() => expect(screen.getByText('Need Alpha')).toBeInTheDocument());
+    expect(screen.getByText('Matched!')).toBeInTheDocument();
   });
 
   it('shows "No needs yet" when list is empty', async () => {
@@ -268,6 +340,30 @@ describe('NewNeedPage', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// NeedBulkImportPage
+// ─────────────────────────────────────────────────────────────
+describe('NeedBulkImportPage', () => {
+  it('previews and commits reviewed need drafts', async () => {
+    routerState.pathname = '/needs/import';
+    mockPreviewNeedImport.mockResolvedValue({
+      items: [{ title: 'Blankets', description: 'Warm blankets', quantity: 5, status: 'open', is_public: true, needed_by: null }],
+      estimatedTokens: 20,
+      inputTokenLimit: 100000,
+      inputMaxChars: 400000,
+    });
+
+    renderWithUser(<NeedBulkImportPage />);
+    await waitFor(() => expect(screen.getByText('Bulk Import Needs')).toBeInTheDocument());
+    await userEvent.type(screen.getByLabelText(/Source text/i), 'We need blankets and coats');
+    await userEvent.click(screen.getByText('Preview Drafts'));
+
+    await waitFor(() => expect(screen.getByDisplayValue('Blankets')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('Import 1 Needs'));
+    await waitFor(() => expect(mockCommitNeedImport).toHaveBeenCalled());
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 // NeedDetailPage
 // ─────────────────────────────────────────────────────────────
 describe('NeedDetailPage', () => {
@@ -282,6 +378,7 @@ describe('NeedDetailPage', () => {
     await waitFor(() => expect(screen.getByText('Need Alpha')).toBeInTheDocument());
     expect(screen.getByText('open')).toBeInTheDocument();
     expect(screen.getByText('A need')).toBeInTheDocument();
+    expect(screen.getByText('Edit')).toBeInTheDocument();
   });
 
   it('shows "Need not found" on 404', async () => {
@@ -372,6 +469,30 @@ describe('NewResourcePage', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// ResourceBulkImportPage
+// ─────────────────────────────────────────────────────────────
+describe('ResourceBulkImportPage', () => {
+  it('previews and commits reviewed resource drafts', async () => {
+    routerState.pathname = '/resources/import';
+    mockPreviewResourceImport.mockResolvedValue({
+      items: [{ title: 'Projector', description: 'HD projector', quantity: 1, status: 'available', is_public: true, available_until: null }],
+      estimatedTokens: 20,
+      inputTokenLimit: 100000,
+      inputMaxChars: 400000,
+    });
+
+    renderWithUser(<ResourceBulkImportPage />);
+    await waitFor(() => expect(screen.getByText('Bulk Import Resources')).toBeInTheDocument());
+    await userEvent.type(screen.getByLabelText(/Source text/i), 'We have one projector to lend');
+    await userEvent.click(screen.getByText('Preview Drafts'));
+
+    await waitFor(() => expect(screen.getByDisplayValue('Projector')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('Import 1 Resources'));
+    await waitFor(() => expect(mockCommitResourceImport).toHaveBeenCalled());
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 // ResourceDetailPage
 // ─────────────────────────────────────────────────────────────
 describe('ResourceDetailPage', () => {
@@ -386,12 +507,81 @@ describe('ResourceDetailPage', () => {
     await waitFor(() => expect(screen.getByText('Resource Alpha')).toBeInTheDocument());
     expect(screen.getByText('available')).toBeInTheDocument();
     expect(screen.getByText('A resource')).toBeInTheDocument();
+    expect(screen.getByText('Edit')).toBeInTheDocument();
   });
 
   it('shows "Resource not found" on error', async () => {
     mockGetOneResource.mockRejectedValue(new Error('Not found'));
     renderWithUser(<ResourceDetailPage />);
     await waitFor(() => expect(screen.getByText('Resource not found.')).toBeInTheDocument());
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// EditNeedPage
+// ─────────────────────────────────────────────────────────────
+describe('EditNeedPage', () => {
+  beforeEach(() => {
+    routerState.query = { id: 'n1' };
+    routerState.pathname = '/needs/n1/edit';
+    mockGetOnNeed.mockResolvedValue(NEED_1);
+  });
+
+  it('loads current need values and saves a new version', async () => {
+    mockUpdateNeed.mockResolvedValue({ ...NEED_1, id: 'n1v2', title: 'Need Alpha v2' });
+    renderWithUser(<EditNeedPage />);
+
+    await waitFor(() => expect(screen.getByDisplayValue('Need Alpha')).toBeInTheDocument());
+    await userEvent.clear(screen.getByLabelText(/Title/));
+    await userEvent.type(screen.getByLabelText(/Title/), 'Need Alpha v2');
+    await userEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => expect(mockUpdateNeed).toHaveBeenCalledWith('n1', expect.objectContaining({ title: 'Need Alpha v2' })));
+    expect(mockPush).toHaveBeenCalledWith('/needs/n1v2');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// EditResourcePage
+// ─────────────────────────────────────────────────────────────
+describe('EditResourcePage', () => {
+  beforeEach(() => {
+    routerState.query = { id: 'r1' };
+    routerState.pathname = '/resources/r1/edit';
+    mockGetOneResource.mockResolvedValue(RESOURCE_1);
+  });
+
+  it('loads current resource values and saves a new version', async () => {
+    mockUpdateResource.mockResolvedValue({ ...RESOURCE_1, id: 'r1v2', title: 'Resource Alpha v2' });
+    renderWithUser(<EditResourcePage />);
+
+    await waitFor(() => expect(screen.getByDisplayValue('Resource Alpha')).toBeInTheDocument());
+    await userEvent.clear(screen.getByLabelText(/Title/));
+    await userEvent.type(screen.getByLabelText(/Title/), 'Resource Alpha v2');
+    await userEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => expect(mockUpdateResource).toHaveBeenCalledWith('r1', expect.objectContaining({ title: 'Resource Alpha v2' })));
+    expect(mockPush).toHaveBeenCalledWith('/resources/r1v2');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// MatchesPage
+// ─────────────────────────────────────────────────────────────
+describe('MatchesPage', () => {
+  it('renders filtered matches for the selected need and marks unseen as seen', async () => {
+    routerState.query = { needId: 'n1' };
+    routerState.pathname = '/matches';
+    mockListMatches.mockResolvedValue([MATCH_1, MATCH_2_SEEN]);
+
+    renderWithUser(<MatchesPage />);
+
+    await waitFor(() => expect(screen.getByText('Matches For Need')).toBeInTheDocument());
+    expect(screen.getAllByText('Need Alpha').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Resource Alpha').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Strong fit').length).toBeGreaterThan(0);
+    expect(screen.getByText('New')).toBeInTheDocument();
+    await waitFor(() => expect(mockMarkMatchesSeen).toHaveBeenCalledWith(['m1']));
   });
 });
 
@@ -462,6 +652,51 @@ describe('lib/api helpers', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('q=foo%20bar'),
       expect.anything()
+    );
+  });
+
+  it('listMatches encodes filter parameters', async () => {
+    mockFetch.mockReturnValueOnce(okResponse([]));
+    await api.listMatches({ needId: 'need 1', resourceId: 'resource 1' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('needId=need+1&resourceId=resource+1'),
+      expect.anything()
+    );
+  });
+
+  it('getUnseenMatchesCount calls unseen-count endpoint', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ count: 3 }));
+    await api.getUnseenMatchesCount();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/unseen-count'),
+      expect.anything()
+    );
+  });
+
+  it('markMatchesSeen posts match ids', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ ok: true, marked: 1 }));
+    await api.markMatchesSeen(['m1']);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/seen'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('previewNeedImport posts free text', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ items: [], estimatedTokens: 1, inputTokenLimit: 100000, inputMaxChars: 400000 }));
+    await api.previewNeedImport('need tents and blankets');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/needs/import/preview'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('previewResourceImport posts free text', async () => {
+    mockFetch.mockReturnValueOnce(okResponse({ items: [], estimatedTokens: 1, inputTokenLimit: 100000, inputMaxChars: 400000 }));
+    await api.previewResourceImport('have tents and blankets');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/resources/import/preview'),
+      expect.objectContaining({ method: 'POST' })
     );
   });
 });

@@ -10,6 +10,7 @@ import { authRouter } from './auth/router';
 import { needsRouter } from './needs/router';
 import { resourcesRouter } from './resources/router';
 import { adminRouter } from './admin/router';
+import { matchesRouter } from './matches/router';
 
 export function createApp(): express.Application {
   const app = express();
@@ -55,6 +56,7 @@ export function createApp(): express.Application {
   app.use('/auth', authRouter);
   app.use('/api/needs', needsRouter);
   app.use('/api/resources', resourcesRouter);
+  app.use('/api/matches', matchesRouter);
   app.use('/admin', adminRouter);
 
   // ── Health checks ────────────────────────────────────────────

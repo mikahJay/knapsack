@@ -43,6 +43,48 @@ export interface Resource {
   updated_at: string;
 }
 
+export interface NeedImportDraft {
+  title: string;
+  description: string | null;
+  quantity: number;
+  status: 'open' | 'fulfilled' | 'closed';
+  is_public: boolean;
+  needed_by: string | null;
+}
+
+export interface ResourceImportDraft {
+  title: string;
+  description: string | null;
+  quantity: number;
+  status: 'available' | 'allocated' | 'retired';
+  is_public: boolean;
+  available_until: string | null;
+}
+
+export interface ImportPreviewResponse<T> {
+  items: T[];
+  estimatedTokens: number;
+  inputTokenLimit: number;
+  inputMaxChars: number;
+}
+
+export interface Match {
+  id: UUID;
+  need_id: UUID;
+  resource_id: UUID;
+  score: number;
+  rationale: string | null;
+  strategy: string;
+  matched_at: string;
+  need_title: string;
+  need_status: string;
+  need_owner_id: UUID | null;
+  resource_title: string;
+  resource_status: string;
+  resource_owner_id: UUID | null;
+  seen_at: string | null;
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -77,6 +119,16 @@ export const deleteNeed = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/needs/${id}`, { method: 'DELETE' });
 export const searchNeeds = (q: string) =>
   apiFetch<Need[]>(`/api/needs/search?q=${encodeURIComponent(q)}`);
+export const previewNeedImport = (text: string) =>
+  apiFetch<ImportPreviewResponse<NeedImportDraft>>('/api/needs/import/preview', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+export const commitNeedImport = (items: NeedImportDraft[]) =>
+  apiFetch<Need[]>('/api/needs/import/commit', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
 
 // ── Resources ─────────────────────────────────────────────────
 export const listResources = () => apiFetch<Resource[]>('/api/resources');
@@ -91,6 +143,35 @@ export const deleteResource = (id: string) =>
   apiFetch<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' });
 export const searchResources = (q: string) =>
   apiFetch<Resource[]>(`/api/resources/search?q=${encodeURIComponent(q)}`);
+export const previewResourceImport = (text: string) =>
+  apiFetch<ImportPreviewResponse<ResourceImportDraft>>('/api/resources/import/preview', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+export const commitResourceImport = (items: ResourceImportDraft[]) =>
+  apiFetch<Resource[]>('/api/resources/import/commit', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });
+
+// ── Matches ───────────────────────────────────────────────────
+export const listMatches = (filters?: { needId?: string; resourceId?: string; unseenOnly?: boolean }) => {
+  const params = new URLSearchParams();
+  if (filters?.needId) params.set('needId', filters.needId);
+  if (filters?.resourceId) params.set('resourceId', filters.resourceId);
+  if (filters?.unseenOnly) params.set('unseenOnly', 'true');
+  const suffix = params.toString();
+  return apiFetch<Match[]>(`/api/matches${suffix ? `?${suffix}` : ''}`);
+};
+
+export const getUnseenMatchesCount = () =>
+  apiFetch<{ count: number }>('/api/matches/unseen-count');
+
+export const markMatchesSeen = (matchIds: string[]) =>
+  apiFetch<{ ok: boolean; marked: number }>('/api/matches/seen', {
+    method: 'POST',
+    body: JSON.stringify({ matchIds }),
+  });
 
 // ── Admin ─────────────────────────────────────────────────────
 export interface RematchStats {

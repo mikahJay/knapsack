@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { getOnNeed, Need } from '../../lib/api';
+import { getOnNeed, Need, listMatches } from '../../lib/api';
 
 const STATUS_COLOURS: Record<string, string> = {
   open: 'bg-green-100 text-green-700',
@@ -25,6 +25,7 @@ export default function NeedDetailPage() {
   const [need, setNeed] = useState<Need | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [matchCount, setMatchCount] = useState(0);
 
   useEffect(() => {
     if (!id || typeof id !== 'string') return;
@@ -33,6 +34,13 @@ export default function NeedDetailPage() {
       .then(setNeed)
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || typeof id !== 'string') return;
+    listMatches({ needId: id })
+      .then((matches) => setMatchCount(matches.length))
+      .catch(() => setMatchCount(0));
   }, [id]);
 
   return (
@@ -50,7 +58,25 @@ export default function NeedDetailPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 max-w-lg">
           <div className="flex items-start justify-between gap-3 mb-3">
-            <h1 className="text-2xl font-bold text-gray-800">{need.title}</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">{need.title}</h1>
+              <div className="mt-2 flex items-center gap-3">
+                <Link
+                  href={`/needs/${encodeURIComponent(need.id)}/edit`}
+                  className="inline-flex text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+                >
+                  Edit
+                </Link>
+              {matchCount > 0 && (
+                <Link
+                  href={`/matches?needId=${encodeURIComponent(need.id)}`}
+                  className="inline-flex text-sm font-semibold text-green-700 hover:text-green-800"
+                >
+                  Matched!
+                </Link>
+              )}
+              </div>
+            </div>
             <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${STATUS_COLOURS[need.status] ?? 'bg-gray-100 text-gray-600'}`}>
               {need.status}
             </span>

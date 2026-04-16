@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Layout from '../../components/Layout';
-import { listResources, deleteResource, Resource, searchResources, getMe } from '../../lib/api';
+import { listResources, deleteResource, Resource, searchResources, getMe, listMatches } from '../../lib/api';
 
 const STATUS_COLOURS: Record<string, string> = {
   available: 'bg-green-100 text-green-700',
@@ -25,6 +25,7 @@ export default function ResourcesPage() {
   const [searchResults, setSearchResults] = useState<Resource[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [matchedResourceIds, setMatchedResourceIds] = useState<string[]>([]);
 
   useEffect(() => {
     listResources().then(setResources).finally(() => setLoading(false));
@@ -32,6 +33,14 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     getMe().then((u) => setCurrentUserId(u.id)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    listMatches()
+      .then((matches) => {
+        setMatchedResourceIds([...new Set(matches.map((match) => match.resource_id))]);
+      })
+      .catch(() => setMatchedResourceIds([]));
   }, []);
 
   useEffect(() => {
@@ -58,17 +67,26 @@ export default function ResourcesPage() {
 
   const alphaCount = (query.match(/[a-zA-Z]/g) ?? []).length;
   const remaining = Math.max(0, 5 - alphaCount);
+  const matchedResourceIdSet = new Set(matchedResourceIds);
 
   return (
     <Layout>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-800">Resources</h1>
-        <Link
-          href="/resources/new"
-          className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-        >
-          + New Resource
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/resources/import"
+            className="border border-indigo-200 text-indigo-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-50 transition"
+          >
+            Bulk Import
+          </Link>
+          <Link
+            href="/resources/new"
+            className="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+          >
+            + New Resource
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -142,6 +160,14 @@ export default function ResourcesPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-gray-800">{resource.title}</p>
+                  {matchedResourceIdSet.has(resource.id) && (
+                    <Link
+                      href={`/matches?resourceId=${encodeURIComponent(resource.id)}`}
+                      className="text-sm font-semibold text-green-700 hover:text-green-800"
+                    >
+                      Matched!
+                    </Link>
+                  )}
                   {resource.quantity > 1 && (
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
                       ×{resource.quantity}

@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { query, queryOne } from '../db';
+import { query, queryOne, pool } from '../db';
 import { requireAuth } from '../auth/router';
 import { AppUser } from '../auth/passport';
 import type { UUID } from '../types';
+import { previewNeedsFromText, ImportNeedItem, ImportPreviewError } from '../import/claude';
 
 export interface Need {
   id: UUID;
@@ -28,7 +29,8 @@ needsRouter.get('/', async (req: Request, res: Response, next: NextFunction) => 
     const userId = (req.user as AppUser).id;
     const needs = await query<Need>(
       `SELECT * FROM need.needs
-       WHERE owner_id = $1 OR is_public = true
+       WHERE replaced_by_id IS NULL
+         AND (owner_id = $1 OR is_public = true)
        ORDER BY created_at DESC`,
       [userId]
     );
@@ -46,7 +48,8 @@ needsRouter.get('/search', async (req: Request, res: Response, next: NextFunctio
     const userId = (req.user as AppUser).id;
     const needs = await query<Need>(
       `SELECT * FROM need.needs
-       WHERE (owner_id = $1 OR is_public = true)
+       WHERE replaced_by_id IS NULL
+         AND (owner_id = $1 OR is_public = true)
          AND (title ILIKE '%' || $2 || '%' OR description ILIKE '%' || $2 || '%')
        ORDER BY
          CASE
@@ -66,12 +69,81 @@ needsRouter.get('/search', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+// POST /api/needs/import/preview — parse free text into draft needs
+needsRouter.post('/import/preview', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text : '';
+    const preview = await previewNeedsFromText(text);
+    res.json(preview);
+  } catch (err) {
+    if (err instanceof ImportPreviewError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    next(err);
+  }
+});
+
+// POST /api/needs/import/commit — persist reviewed need drafts
+needsRouter.post('/import/commit', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const raw = req.body?.items;
+    if (!Array.isArray(raw)) return res.status(400).json({ error: 'items must be an array' });
+    if (raw.length === 0) return res.json([]);
+
+    const userId = (req.user as AppUser).id;
+    const items = raw as ImportNeedItem[];
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      const created: Need[] = [];
+      for (const item of items) {
+        const title = typeof item.title === 'string' ? item.title.trim() : '';
+        if (!title) continue;
+
+        const quantity = Number.isFinite(Number(item.quantity)) && Number(item.quantity) >= 1
+          ? Math.floor(Number(item.quantity))
+          : 1;
+        const status = ['open', 'fulfilled', 'closed'].includes(item.status) ? item.status : 'open';
+
+        const inserted = await client.query<Need>(
+          `INSERT INTO need.needs (title, description, status, is_public, quantity, needed_by, owner_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [
+            title,
+            item.description?.trim() || null,
+            status,
+            item.is_public ?? true,
+            quantity,
+            item.needed_by?.trim() || null,
+            userId,
+          ]
+        );
+        if (inserted.rows[0]) created.push(inserted.rows[0]);
+      }
+      await client.query('COMMIT');
+      res.status(201).json(created);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/needs/:id — own, or public
 needsRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req.user as AppUser).id;
     const need = await queryOne<Need>(
-      `SELECT * FROM need.needs WHERE id = $1 AND (owner_id = $2 OR is_public = true)`,
+      `SELECT * FROM need.needs
+       WHERE id = $1
+         AND replaced_by_id IS NULL
+         AND (owner_id = $2 OR is_public = true)`,
       [req.params['id'], userId]
     );
     if (!need) return res.status(404).json({ error: 'Not found' });
@@ -126,27 +198,49 @@ needsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction) 
 
     const userId = (req.user as AppUser).id;
     const existing = await queryOne<Need>(
-      'SELECT * FROM need.needs WHERE id = $1 AND owner_id = $2',
+      `SELECT * FROM need.needs
+       WHERE id = $1 AND owner_id = $2 AND replaced_by_id IS NULL`,
       [req.params['id'], userId]
     );
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
-    const need = await queryOne<Need>(
-      `UPDATE need.needs
-       SET title = $1, description = $2, status = $3, is_public = $4, quantity = $5, needed_by = $6
-       WHERE id = $7
-       RETURNING *`,
-      [
-        title?.trim() ?? existing.title,
-        description !== undefined ? description : existing.description,
-        status ?? existing.status,
-        is_public !== undefined ? is_public : existing.is_public,
-        quantity ?? existing.quantity,
-        needed_by !== undefined ? needed_by : existing.needed_by,
-        req.params['id'],
-      ]
-    );
-    res.json(need);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const inserted = await client.query<Need>(
+        `INSERT INTO need.needs (title, description, status, is_public, quantity, needed_by, owner_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [
+          title?.trim() ?? existing.title,
+          description !== undefined ? description : existing.description,
+          status ?? existing.status,
+          is_public !== undefined ? is_public : existing.is_public,
+          quantity ?? existing.quantity,
+          needed_by !== undefined ? needed_by : existing.needed_by,
+          existing.owner_id,
+        ]
+      );
+
+      const nextNeed = inserted.rows[0];
+      if (!nextNeed) throw new Error('Failed to create new need version');
+
+      await client.query(
+        `UPDATE need.needs
+         SET replaced_by_id = $1
+         WHERE id = $2`,
+        [nextNeed.id, req.params['id']]
+      );
+
+      await client.query('COMMIT');
+      res.json(nextNeed);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }
@@ -157,7 +251,7 @@ needsRouter.delete('/:id', async (req: Request, res: Response, next: NextFunctio
   try {
     const userId = (req.user as AppUser).id;
     const result = await query<{ id: string }>(
-      'DELETE FROM need.needs WHERE id = $1 AND owner_id = $2 RETURNING id',
+      'DELETE FROM need.needs WHERE id = $1 AND owner_id = $2 AND replaced_by_id IS NULL RETURNING id',
       [req.params['id'], userId]
     );
     if (result.length === 0) return res.status(404).json({ error: 'Not found' });

@@ -22,12 +22,14 @@ export async function fullRematch(): Promise<RematchStats> {
   const needs = await query<Need>(
     `SELECT id, title, description, status
      FROM need.needs
-     WHERE status = 'open'`
+     WHERE status = 'open'
+       AND replaced_by_id IS NULL`
   );
   const resources = await query<Resource>(
     `SELECT id, title, description, status
      FROM resource.resources
-     WHERE status = 'available'`
+     WHERE status = 'available'
+       AND replaced_by_id IS NULL`
   );
   return runMatch(needs, resources);
 }
@@ -48,6 +50,7 @@ export async function partialRematch(since?: Date): Promise<RematchStats> {
     `SELECT id, title, description, status
      FROM need.needs
      WHERE status = 'open'
+       AND replaced_by_id IS NULL
        AND (created_at >= $1 OR updated_at >= $1)`,
     [sinceDate]
   );
@@ -57,7 +60,8 @@ export async function partialRematch(since?: Date): Promise<RematchStats> {
   const resources = await query<Resource>(
     `SELECT id, title, description, status
      FROM resource.resources
-     WHERE status = 'available'`
+     WHERE status = 'available'
+       AND replaced_by_id IS NULL`
   );
 
   return runMatch(needs, resources);

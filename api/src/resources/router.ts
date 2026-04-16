@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { query, queryOne } from '../db';
+import { query, queryOne, pool } from '../db';
 import { requireAuth } from '../auth/router';
 import { AppUser } from '../auth/passport';
 import type { UUID } from '../types';
+import { previewResourcesFromText, ImportResourceItem, ImportPreviewError } from '../import/claude';
 
 export interface Resource {
   id: UUID;
@@ -28,7 +29,8 @@ resourcesRouter.get('/', async (req: Request, res: Response, next: NextFunction)
     const userId = (req.user as AppUser).id;
     const resources = await query<Resource>(
       `SELECT * FROM resource.resources
-       WHERE owner_id = $1 OR is_public = true
+       WHERE replaced_by_id IS NULL
+         AND (owner_id = $1 OR is_public = true)
        ORDER BY created_at DESC`,
       [userId]
     );
@@ -46,7 +48,8 @@ resourcesRouter.get('/search', async (req: Request, res: Response, next: NextFun
     const userId = (req.user as AppUser).id;
     const resources = await query<Resource>(
       `SELECT * FROM resource.resources
-       WHERE (owner_id = $1 OR is_public = true)
+       WHERE replaced_by_id IS NULL
+         AND (owner_id = $1 OR is_public = true)
          AND (title ILIKE '%' || $2 || '%' OR description ILIKE '%' || $2 || '%')
        ORDER BY
          CASE
@@ -66,12 +69,81 @@ resourcesRouter.get('/search', async (req: Request, res: Response, next: NextFun
   }
 });
 
+// POST /api/resources/import/preview — parse free text into draft resources
+resourcesRouter.post('/import/preview', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text : '';
+    const preview = await previewResourcesFromText(text);
+    res.json(preview);
+  } catch (err) {
+    if (err instanceof ImportPreviewError) {
+      return res.status(err.status).json({ error: err.message });
+    }
+    next(err);
+  }
+});
+
+// POST /api/resources/import/commit — persist reviewed resource drafts
+resourcesRouter.post('/import/commit', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const raw = req.body?.items;
+    if (!Array.isArray(raw)) return res.status(400).json({ error: 'items must be an array' });
+    if (raw.length === 0) return res.json([]);
+
+    const userId = (req.user as AppUser).id;
+    const items = raw as ImportResourceItem[];
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      const created: Resource[] = [];
+      for (const item of items) {
+        const title = typeof item.title === 'string' ? item.title.trim() : '';
+        if (!title) continue;
+
+        const quantity = Number.isFinite(Number(item.quantity)) && Number(item.quantity) >= 1
+          ? Math.floor(Number(item.quantity))
+          : 1;
+        const status = ['available', 'allocated', 'retired'].includes(item.status) ? item.status : 'available';
+
+        const inserted = await client.query<Resource>(
+          `INSERT INTO resource.resources (title, description, status, is_public, quantity, available_until, owner_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [
+            title,
+            item.description?.trim() || null,
+            status,
+            item.is_public ?? true,
+            quantity,
+            item.available_until?.trim() || null,
+            userId,
+          ]
+        );
+        if (inserted.rows[0]) created.push(inserted.rows[0]);
+      }
+      await client.query('COMMIT');
+      res.status(201).json(created);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/resources/:id — own, or public
 resourcesRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req.user as AppUser).id;
     const resource = await queryOne<Resource>(
-      `SELECT * FROM resource.resources WHERE id = $1 AND (owner_id = $2 OR is_public = true)`,
+      `SELECT * FROM resource.resources
+       WHERE id = $1
+         AND replaced_by_id IS NULL
+         AND (owner_id = $2 OR is_public = true)`,
       [req.params['id'], userId]
     );
     if (!resource) return res.status(404).json({ error: 'Not found' });
@@ -126,27 +198,49 @@ resourcesRouter.put('/:id', async (req: Request, res: Response, next: NextFuncti
 
     const userId = (req.user as AppUser).id;
     const existing = await queryOne<Resource>(
-      'SELECT * FROM resource.resources WHERE id = $1 AND owner_id = $2',
+      `SELECT * FROM resource.resources
+       WHERE id = $1 AND owner_id = $2 AND replaced_by_id IS NULL`,
       [req.params['id'], userId]
     );
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
-    const resource = await queryOne<Resource>(
-      `UPDATE resource.resources
-       SET title = $1, description = $2, status = $3, is_public = $4, quantity = $5, available_until = $6
-       WHERE id = $7
-       RETURNING *`,
-      [
-        title?.trim() ?? existing.title,
-        description !== undefined ? description : existing.description,
-        status ?? existing.status,
-        is_public !== undefined ? is_public : existing.is_public,
-        quantity ?? existing.quantity,
-        available_until !== undefined ? available_until : existing.available_until,
-        req.params['id'],
-      ]
-    );
-    res.json(resource);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const inserted = await client.query<Resource>(
+        `INSERT INTO resource.resources (title, description, status, is_public, quantity, available_until, owner_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [
+          title?.trim() ?? existing.title,
+          description !== undefined ? description : existing.description,
+          status ?? existing.status,
+          is_public !== undefined ? is_public : existing.is_public,
+          quantity ?? existing.quantity,
+          available_until !== undefined ? available_until : existing.available_until,
+          existing.owner_id,
+        ]
+      );
+
+      const nextResource = inserted.rows[0];
+      if (!nextResource) throw new Error('Failed to create new resource version');
+
+      await client.query(
+        `UPDATE resource.resources
+         SET replaced_by_id = $1
+         WHERE id = $2`,
+        [nextResource.id, req.params['id']]
+      );
+
+      await client.query('COMMIT');
+      res.json(nextResource);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     next(err);
   }
@@ -157,7 +251,7 @@ resourcesRouter.delete('/:id', async (req: Request, res: Response, next: NextFun
   try {
     const userId = (req.user as AppUser).id;
     const result = await query<{ id: string }>(
-      'DELETE FROM resource.resources WHERE id = $1 AND owner_id = $2 RETURNING id',
+      'DELETE FROM resource.resources WHERE id = $1 AND owner_id = $2 AND replaced_by_id IS NULL RETURNING id',
       [req.params['id'], userId]
     );
     if (result.length === 0) return res.status(404).json({ error: 'Not found' });
