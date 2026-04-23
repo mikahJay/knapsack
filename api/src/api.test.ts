@@ -38,10 +38,10 @@ async function makeLoggedInAgent() {
 describe('Auth — non-prod bypass', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('GET /health returns isProd:false', async () => {
+  it('GET /health returns ok:true', async () => {
     const res = await request(createApp()).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body.isProd).toBe(false);
+    expect(res.body.ok).toBe(true);
   });
 
   it('GET /auth/me returns 401 when not logged in', async () => {
@@ -361,7 +361,8 @@ describe('Health checks', () => {
     const res = await request(createApp()).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.isProd).toBe(false);
+    // isProd is intentionally not exposed (reduces information leakage)
+    expect(res.body.isProd).toBeUndefined();
     expect(typeof res.body.uptime).toBe('number');
     expect(typeof res.body.timestamp).toBe('string');
   });
@@ -377,14 +378,15 @@ describe('Health checks', () => {
     expect(res.body.checks.db.error).toBeUndefined();
   });
 
-  it('GET /health/deep returns 503 and db error when DB is unreachable', async () => {
+  it('GET /health/deep returns 503 without leaking db error when DB is unreachable', async () => {
     mockPool.query.mockRejectedValueOnce(new Error('connection refused'));
 
     const res = await request(createApp()).get('/health/deep');
     expect(res.status).toBe(503);
     expect(res.body.ok).toBe(false);
     expect(res.body.checks.db.ok).toBe(false);
-    expect(res.body.checks.db.error).toBe('connection refused');
+    // DB error details must NOT be exposed to unauthenticated callers
+    expect(res.body.checks.db.error).toBeUndefined();
     expect(res.body.checks.db.latencyMs).toBeUndefined();
   });
 });
