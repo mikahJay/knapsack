@@ -170,10 +170,15 @@ function reject(code: PhotoImportReasonCode): PhotoImportRejectResult {
 
 function containsPolicyText(text: string | null | undefined): boolean {
   if (!text) return false;
-  // Broad list of terms that indicate adult / harmful content.
+  // Categorised lists of terms that indicate adult / harmful content.
   // Claude is asked to extract visible text, so matching here adds a
   // defence-in-depth layer on top of the moderation verdict.
-  return /(explicit|nude|nudity|naked|nsfw|fetish|sexual|xxx|porn|hentai|adult.?content|18\+|onlyfans|escort|cam.?girl|live.?sex|sex.?chat|violence|gore|weapon|firearm|gun|knife|drug|cocaine|heroin|meth|fentanyl|cannabis\s+deal|weed\s+for\s+sale|hate\s+speech|racial.?slur|child\s+abuse|cp\b)/i.test(text);
+  const adultContent = /(explicit|nude|nudity|naked|nsfw|fetish|sexual|xxx|porn|hentai|adult.?content|18\+|onlyfans|escort|cam.?girl|live.?sex|sex.?chat)/i;
+  const violenceWeapons = /(violence|gore|weapon|firearm|gun|knife)/i;
+  const drugs = /(cocaine|heroin|meth|fentanyl|cannabis\s+deal|weed\s+for\s+sale)/i;
+  const hatefulAbusive = /(hate\s+speech|racial.?slur|child\s+abuse|\bcp\b)/i;
+
+  return adultContent.test(text) || violenceWeapons.test(text) || drugs.test(text) || hatefulAbusive.test(text);
 }
 
 function clamp01(n: number): number {

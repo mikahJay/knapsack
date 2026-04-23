@@ -16,6 +16,8 @@ import {
   validateMagicBytes,
 } from '../import/moderation';
 
+type AllowedPhotoMime = (typeof PHOTO_IMPORT_ALLOWED_MIME_TYPES)[number];
+
 export interface Resource {
   id: UUID;
   title: string;
@@ -46,7 +48,7 @@ const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: PHOTO_IMPORT_MAX_SIZE_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(file.mimetype as (typeof PHOTO_IMPORT_ALLOWED_MIME_TYPES)[number])) {
+    if (PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(file.mimetype as AllowedPhotoMime)) {
       cb(null, true);
       return;
     }
@@ -250,7 +252,7 @@ resourcesRouter.post('/import/commit', async (req: Request, res: Response, next:
           // This prevents a bypass where a user previews a safe image but
           // substitutes different base64 content when committing.
           const photoMime = item.photo.mimeType ?? '';
-          if (!PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(photoMime as (typeof PHOTO_IMPORT_ALLOWED_MIME_TYPES)[number])) {
+          if (!PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(photoMime as AllowedPhotoMime)) {
             throw Object.assign(new Error('Photo has unsupported MIME type.'), { status: 400 });
           }
 
