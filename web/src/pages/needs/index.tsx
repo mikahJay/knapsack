@@ -165,6 +165,9 @@ export default function NeedsPage() {
                   >
                     {need.title}
                   </Link>
+                  {currentUserId && need.owner_id === currentUserId && (
+                    <span className="text-xs font-normal text-indigo-500">(mine)</span>
+                  )}
                   {matchedNeedIdSet.has(need.id) && (
                     <Link
                       href={`/matches?needId=${encodeURIComponent(need.id)}`}

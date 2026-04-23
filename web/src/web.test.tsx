@@ -69,6 +69,18 @@ const NEED_OTHER: import('./lib/api').Need = {
   is_public: true, quantity: 2, needed_by: null, owner_id: 'other-uuid',
   created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
 };
+const NEED_PRIVATE_MINE: import('./lib/api').Need = {
+  id: 'n-private',
+  title: 'Private Bob Need',
+  description: 'For Bob only',
+  status: 'open',
+  is_public: false,
+  quantity: 1,
+  needed_by: null,
+  owner_id: 'bob-uuid',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+};
 const RESOURCE_1: import('./lib/api').Resource = {
   id: 'r1', title: 'Resource Alpha', description: 'A resource', status: 'available',
   is_public: true, quantity: 3, available_until: null, owner_id: 'bob-uuid',
@@ -384,6 +396,35 @@ describe('NewNeedPage', () => {
     await waitFor(() => screen.getByLabelText(/Needed by/));
     const input = screen.getByLabelText(/Needed by/) as HTMLInputElement;
     expect(input.value).toBe(new Date().toISOString().slice(0, 10));
+  });
+
+  it('bob creates a private need and sees it marked as (mine) in needs list', async () => {
+    mockCreateNeed.mockResolvedValue(NEED_PRIVATE_MINE);
+
+    const { unmount } = renderWithUser(<NewNeedPage />);
+    await waitFor(() => screen.getByLabelText(/Title/));
+    await userEvent.type(screen.getByLabelText(/Title/), NEED_PRIVATE_MINE.title);
+    await userEvent.click(screen.getByText('Create'));
+
+    await waitFor(() =>
+      expect(mockCreateNeed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: NEED_PRIVATE_MINE.title,
+          is_public: false,
+        })
+      )
+    );
+    expect(mockPush).toHaveBeenCalledWith('/needs');
+
+    unmount();
+
+    mockListNeeds.mockResolvedValue([NEED_PRIVATE_MINE]);
+    renderWithUser(<NeedsPage />);
+    await waitFor(() => expect(screen.getByText(NEED_PRIVATE_MINE.title)).toBeInTheDocument());
+
+    const needRow = screen.getByText(NEED_PRIVATE_MINE.title).closest('li');
+    expect(needRow).toHaveTextContent('Private');
+    expect(needRow).toHaveTextContent('(mine)');
   });
 });
 
