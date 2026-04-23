@@ -1,5 +1,10 @@
-import 'dotenv/config';
+import { config as dotenvConfig } from 'dotenv';
+import { resolve } from 'path';
 import { Pool } from 'pg';
+
+// Load from test-data/.env first, then fall back to repo root .env
+dotenvConfig();
+dotenvConfig({ path: resolve(__dirname, '../../.env'), override: false });
 
 const connectionString =
   process.env['DATABASE_URL'] ?? 'postgres://knapsack:knapsack@localhost:5432/knapsack';

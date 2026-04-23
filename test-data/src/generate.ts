@@ -14,13 +14,14 @@
  *   --bob-pct  N     % of items owned by bob        (0-100, default 20)
  *                    (ignored when env=prod)
  *   --public-pct N   % of items marked public       (0-100, default 100)
+ *   --no-ai          Skip Claude; use random word-pool titles/descriptions
  *
  * Environment variable DATABASE_URL is read from .env (or inherited).
+ * Environment variable ANTHROPIC_API_KEY is required unless --no-ai is passed.
  */
 
 import { query, queryOne, end } from './db';
 import {
-  TEST_PREFIX,
   testOwnerEmail,
   testOwnerName,
   randomNeedTitle,
@@ -29,6 +30,7 @@ import {
   randomResourceStatus,
   randomDescription,
 } from './data';
+import { generateWithClaude, GeneratedItem } from './claude';
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
 
@@ -39,6 +41,7 @@ interface Args {
   owners: number;
   bobPct: number;
   publicPct: number;
+  noAi: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -49,6 +52,7 @@ function parseArgs(argv: string[]): Args {
     owners: 5,
     bobPct: 20,
     publicPct: 100,
+    noAi: false,
   };
 
   const positionals: string[] = [];
@@ -65,6 +69,8 @@ function parseArgs(argv: string[]): Args {
       args.bobPct = parseIntArg('--bob-pct', argv[++i]);
     } else if (arg === '--public-pct') {
       args.publicPct = parseIntArg('--public-pct', argv[++i]);
+    } else if (arg === '--no-ai') {
+      args.noAi = true;
     } else if (!arg.startsWith('--')) {
       positionals.push(arg);
     }
@@ -209,7 +215,7 @@ async function main(): Promise<void> {
     `\nGenerating test data [env=${args.env}] ` +
       `needs=${args.needs} resources=${args.resources} ` +
       `owners=${args.owners} bob-pct=${args.env === 'prod' ? 'n/a' : args.bobPct + '%'} ` +
-      `public-pct=${args.publicPct}%\n`
+      `public-pct=${args.publicPct}% ai=${!args.noAi}\n`
   );
 
   // 1. Ensure the 100-owner pool exists
@@ -237,7 +243,34 @@ async function main(): Promise<void> {
   const needPublicFlags = buildPublicFlags(args.needs, args.publicPct);
   const resourcePublicFlags = buildPublicFlags(args.resources, args.publicPct);
 
-  // 5. Insert needs
+  // 5. Generate titles + descriptions
+  let needItems: Array<{ title: string; description: string }> = [];
+  let resourceItems: Array<{ title: string; description: string }> = [];
+
+  if (args.noAi || !process.env['ANTHROPIC_API_KEY']) {
+    if (!args.noAi && !process.env['ANTHROPIC_API_KEY']) {
+      console.log('Warning: ANTHROPIC_API_KEY not set — falling back to random word-pool data.');
+    }
+    needItems = Array.from({ length: args.needs }, () => ({
+      title: randomNeedTitle(),
+      description: randomDescription('need'),
+    }));
+    resourceItems = Array.from({ length: args.resources }, () => ({
+      title: randomResourceTitle(),
+      description: randomDescription('resource'),
+    }));
+  } else {
+    if (args.needs > 0) {
+      console.log(`Generating ${args.needs} need(s) with Claude …`);
+      needItems = await generateWithClaude('need', args.needs);
+    }
+    if (args.resources > 0) {
+      console.log(`Generating ${args.resources} resource(s) with Claude …`);
+      resourceItems = await generateWithClaude('resource', args.resources);
+    }
+  }
+
+  // 6. Insert needs
   if (args.needs > 0) {
     process.stdout.write(`Inserting ${args.needs} need(s) … `);
     for (let i = 0; i < args.needs; i++) {
@@ -245,8 +278,8 @@ async function main(): Promise<void> {
         `INSERT INTO need.needs (title, description, status, owner_id, is_public)
          VALUES ($1, $2, $3, $4, $5)`,
         [
-          randomNeedTitle(),
-          randomDescription('need'),
+          needItems[i]!.title,
+          needItems[i]!.description,
           randomNeedStatus(),
           needOwnerIds[i]!,
           needPublicFlags[i]!,
@@ -256,7 +289,7 @@ async function main(): Promise<void> {
     console.log('done');
   }
 
-  // 6. Insert resources
+  // 7. Insert resources
   if (args.resources > 0) {
     process.stdout.write(`Inserting ${args.resources} resource(s) … `);
     for (let i = 0; i < args.resources; i++) {
@@ -264,8 +297,8 @@ async function main(): Promise<void> {
         `INSERT INTO resource.resources (title, description, status, owner_id, is_public)
          VALUES ($1, $2, $3, $4, $5)`,
         [
-          randomResourceTitle(),
-          randomDescription('resource'),
+          resourceItems[i]!.title,
+          resourceItems[i]!.description,
           randomResourceStatus(),
           resourceOwnerIds[i]!,
           resourcePublicFlags[i]!,
@@ -275,7 +308,7 @@ async function main(): Promise<void> {
     console.log('done');
   }
 
-  // 7. Summary
+  // 8. Summary
   const needBobCount = needOwnerIds.filter((id) => id === bob?.id).length;
   const resourceBobCount = resourceOwnerIds.filter((id) => id === bob?.id).length;
   const needPublicCount = needPublicFlags.filter(Boolean).length;
