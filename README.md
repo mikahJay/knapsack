@@ -50,6 +50,12 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 This stack runs stable built application processes in non-prod mode. For hot reload,
 use local dev mode instead of Docker.
 
+If the shell scripts are not executable yet, run this once:
+
+```bash
+chmod +x scripts/setup.sh scripts/start.sh
+```
+
 ```bash
 # Unix / macOS / Linux
 bash scripts/setup.sh
@@ -87,6 +93,12 @@ After startup:
 ## Setup
 
 The setup scripts (above) do everything automatically. To run the steps manually:
+
+On Linux or macOS, you can make the setup and start scripts directly executable with:
+
+```bash
+chmod +x scripts/setup.sh scripts/start.sh
+```
 
 ```bash
 # 1. Install dependencies

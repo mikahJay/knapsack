@@ -28,7 +28,7 @@ export class ClaudeMatchingStrategy implements MatchingStrategy {
   constructor() {
     // Anthropic client reads ANTHROPIC_API_KEY from env automatically
     this.client = new Anthropic();
-    this.model = process.env['CLAUDE_MODEL'] ?? 'claude-3-haiku-20240307';
+    this.model = process.env['CLAUDE_MODEL'] ?? 'claude-3-5-haiku-20241022';
   }
 
   async match(needs: Need[], resources: Resource[]): Promise<MatchResult[]> {
