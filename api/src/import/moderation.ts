@@ -5,6 +5,46 @@ export const PHOTO_IMPORT_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'imag
 export const PHOTO_IMPORT_MAX_SIZE_BYTES = 10 * 1024 * 1024;
 export const PHOTO_IMPORT_MIN_DIMENSION = 640;
 
+// Maximum decoded byte length accepted for imageBase64 values arriving in JSON
+// bodies (e.g. the commit endpoint). Matches PHOTO_IMPORT_MAX_SIZE_BYTES.
+export const PHOTO_IMPORT_MAX_BASE64_DECODED_BYTES = PHOTO_IMPORT_MAX_SIZE_BYTES;
+
+// ── Magic-byte signatures for every allowed MIME type ─────────────────────────
+const MAGIC_BYTES: Array<{ mime: string; bytes: number[]; offset: number }> = [
+  // JPEG: FF D8 FF
+  { mime: 'image/jpeg', bytes: [0xff, 0xd8, 0xff], offset: 0 },
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  { mime: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], offset: 0 },
+  // WebP: "RIFF" at 0 and "WEBP" at 8
+  { mime: 'image/webp', bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 },
+];
+
+/**
+ * Returns true when the leading bytes of `buf` match the expected magic
+ * signature for the declared MIME type.  Returns false if the MIME type is
+ * unknown or the signature does not match.
+ */
+export function validateMagicBytes(buf: Buffer, declaredMime: string): boolean {
+  if (buf.length < 12) return false;
+
+  for (const sig of MAGIC_BYTES) {
+    if (sig.mime !== declaredMime) continue;
+
+    const matches = sig.bytes.every((b, i) => buf[sig.offset + i] === b);
+    if (!matches) return false;
+
+    // Extra check for WebP: bytes 8–11 must be "WEBP"
+    if (declaredMime === 'image/webp') {
+      const webp = [0x57, 0x45, 0x42, 0x50];
+      if (!webp.every((b, i) => buf[8 + i] === b)) return false;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 export type PhotoImportReasonCode =
   | 'UNSUPPORTED_MIME'
   | 'FILE_TOO_LARGE'
@@ -130,7 +170,15 @@ function reject(code: PhotoImportReasonCode): PhotoImportRejectResult {
 
 function containsPolicyText(text: string | null | undefined): boolean {
   if (!text) return false;
-  return /(explicit|nude|nsfw|fetish|sexual|xxx)/i.test(text);
+  // Categorised lists of terms that indicate adult / harmful content.
+  // Claude is asked to extract visible text, so matching here adds a
+  // defence-in-depth layer on top of the moderation verdict.
+  const adultContent = /(explicit|nude|nudity|naked|nsfw|fetish|sexual|xxx|porn|hentai|adult.?content|18\+|onlyfans|escort|cam.?girl|live.?sex|sex.?chat)/i;
+  const violenceWeapons = /(violence|gore|weapon|firearm|gun|knife)/i;
+  const drugs = /(cocaine|heroin|meth|fentanyl|cannabis\s+deal|weed\s+for\s+sale)/i;
+  const hatefulAbusive = /(hate\s+speech|racial.?slur|child\s+abuse|\bcp\b)/i;
+
+  return adultContent.test(text) || violenceWeapons.test(text) || drugs.test(text) || hatefulAbusive.test(text);
 }
 
 function clamp01(n: number): number {
@@ -250,9 +298,15 @@ async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnal
   const model = process.env['CLAUDE_MODEL'] ?? 'claude-3-haiku-20240307';
 
   if (!process.env['ANTHROPIC_API_KEY']) {
+    // No API key → moderation cannot run.  Default to ambiguous so images are
+    // NOT automatically accepted when the key is missing in production.
+    console.warn(
+      '[moderation] ANTHROPIC_API_KEY is not set — photo moderation is DISABLED. ' +
+        'Images will be rejected as ambiguous until a key is configured.'
+    );
     return {
-      moderationVerdict: 'safe',
-      relevanceVerdict: 'resource',
+      moderationVerdict: 'ambiguous',
+      relevanceVerdict: 'not_resource',
       extractedText: '',
       drafts: [buildDraftPreview()],
       diagnostics: {
@@ -260,8 +314,8 @@ async function analyzeWithClaude(file: UploadedPhotoMetadata): Promise<PhotoAnal
         model,
         usedVision: false,
         latencyMs: Date.now() - started,
-        moderationVerdict: 'safe',
-        relevanceVerdict: 'resource',
+        moderationVerdict: 'ambiguous',
+        relevanceVerdict: 'not_resource',
         extractedTextPreview: '',
         detectionsCount: 0,
       },

@@ -9,10 +9,14 @@ import { previewResourcesFromText, ImportResourceItem, ImportPreviewError } from
 import {
   PHOTO_IMPORT_ALLOWED_MIME_TYPES,
   PHOTO_IMPORT_MAX_SIZE_BYTES,
+  PHOTO_IMPORT_MAX_BASE64_DECODED_BYTES,
   httpStatusForPhotoImportResult,
   ResourcePhotoAttachment,
   previewResourcePhotoImport,
+  validateMagicBytes,
 } from '../import/moderation';
+
+type AllowedPhotoMime = (typeof PHOTO_IMPORT_ALLOWED_MIME_TYPES)[number];
 
 export interface Resource {
   id: UUID;
@@ -44,7 +48,7 @@ const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: PHOTO_IMPORT_MAX_SIZE_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(file.mimetype as (typeof PHOTO_IMPORT_ALLOWED_MIME_TYPES)[number])) {
+    if (PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(file.mimetype as AllowedPhotoMime)) {
       cb(null, true);
       return;
     }
@@ -142,6 +146,16 @@ resourcesRouter.post('/import/photo/preview', async (req: Request, res: Response
         const file = req.file;
         if (!file) return res.status(400).json({ error: 'photo file is required' });
 
+        // Validate actual file content against declared MIME type (defence against
+        // Content-Type header spoofing — multer trusts the header, not the bytes).
+        if (!validateMagicBytes(file.buffer, file.mimetype)) {
+          return res.status(400).json({
+            status: 'reject',
+            code: 'UNSUPPORTED_MIME',
+            message: 'File content does not match the declared image type.',
+          });
+        }
+
         const dims = imageSize(file.buffer);
         const width = typeof dims.width === 'number' ? dims.width : 0;
         const height = typeof dims.height === 'number' ? dims.height : 0;
@@ -234,6 +248,23 @@ resourcesRouter.post('/import/commit', async (req: Request, res: Response, next:
 
         const createdRow = inserted.rows[0];
         if (createdRow && item.photo?.imageBase64) {
+          // Re-validate photo data submitted by the client at commit time.
+          // This prevents a bypass where a user previews a safe image but
+          // substitutes different base64 content when committing.
+          const photoMime = item.photo.mimeType ?? '';
+          if (!PHOTO_IMPORT_ALLOWED_MIME_TYPES.includes(photoMime as AllowedPhotoMime)) {
+            throw Object.assign(new Error('Photo has unsupported MIME type.'), { status: 400 });
+          }
+
+          const photoBytes = Buffer.from(item.photo.imageBase64, 'base64');
+          if (photoBytes.length > PHOTO_IMPORT_MAX_BASE64_DECODED_BYTES) {
+            throw Object.assign(new Error('Photo exceeds maximum allowed size.'), { status: 400 });
+          }
+
+          if (!validateMagicBytes(photoBytes, photoMime)) {
+            throw Object.assign(new Error('Photo content does not match declared MIME type.'), { status: 400 });
+          }
+
           await client.query(
             `INSERT INTO resource.resource_photos
               (resource_id, mime_type, image_base64, image_width, image_height, focus_box, detections)
@@ -267,6 +298,9 @@ resourcesRouter.post('/import/commit', async (req: Request, res: Response, next:
       client.release();
     }
   } catch (err) {
+    if (err instanceof Error && 'status' in err && typeof (err as { status: unknown }).status === 'number') {
+      return res.status((err as { status: number }).status).json({ error: err.message });
+    }
     next(err);
   }
 });
