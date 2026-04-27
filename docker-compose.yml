@@ -39,7 +39,7 @@ services:
       SESSION_SECRET: local-dev-secret-change-in-prod
       MATCHER_URL: http://matcher:5000
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
-      CLAUDE_MODEL: "${CLAUDE_MODEL:-claude-3-5-haiku-20241022}"
+      CLAUDE_MODEL: "${CLAUDE_MODEL:-claude-haiku-4-5-20251001}"
       BULK_IMPORT_LOWEST_TOKEN_LIMIT: "${BULK_IMPORT_LOWEST_TOKEN_LIMIT:-200000}"
       # Google OAuth (not needed in non-prod, but define for completeness)
       GOOGLE_CLIENT_ID: ""
@@ -65,7 +65,7 @@ services:
       # Active matching strategy — swap to another registered strategy name to change engine
       MATCHING_STRATEGY: claude
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
-      CLAUDE_MODEL: "${CLAUDE_MODEL:-claude-3-5-haiku-20241022}"
+      CLAUDE_MODEL: "${CLAUDE_MODEL:-claude-haiku-4-5-20251001}"
     ports:
       - "5000:5000"
 

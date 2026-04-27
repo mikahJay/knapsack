@@ -142,6 +142,26 @@ export interface Match {
   resource_status: string;
   resource_owner_id: UUID | null;
   seen_at: string | null;
+  pair_status: 'open' | 'in_conversation' | 'closed_rejected' | 'closed_flagged';
+  my_action: MatchActionType | null;
+  my_action_details: string | null;
+  my_action_updated_at: string | null;
+}
+
+export type MatchActionType = 'rejected' | 'clarify' | 'soft_yes' | 'snoozed' | 'flagged';
+
+export interface MatchActionRequest {
+  action: MatchActionType;
+  details?: string;
+}
+
+export interface MatchActionResponse {
+  ok: boolean;
+  message: string;
+  matchId: UUID;
+  action: MatchActionType;
+  details: string | null;
+  pairStatus: 'open' | 'in_conversation' | 'closed_rejected' | 'closed_flagged';
 }
 
 async function apiFetch<T>(
@@ -246,6 +266,12 @@ export const markMatchesSeen = (matchIds: string[]) =>
   apiFetch<{ ok: boolean; marked: number }>('/api/matches/seen', {
     method: 'POST',
     body: JSON.stringify({ matchIds }),
+  });
+
+export const applyMatchAction = (matchId: string, body: MatchActionRequest) =>
+  apiFetch<MatchActionResponse>(`/api/matches/${encodeURIComponent(matchId)}/actions`, {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 
 // ── Admin ─────────────────────────────────────────────────────

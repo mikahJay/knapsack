@@ -17,7 +17,7 @@ const MAX_BATCH_MATCHES = NEED_BATCH_SIZE * MAX_MATCHES_PER_NEED;
  *
  * Configuration (environment variables):
  *   ANTHROPIC_API_KEY   — required; Anthropic API key
- *   CLAUDE_MODEL        — model to use (default: claude-3-5-haiku-20241022)
+ *   CLAUDE_MODEL        — model to use (default: claude-haiku-4-5-20251001)
  */
 export class ClaudeMatchingStrategy implements MatchingStrategy {
   readonly name = 'claude';
@@ -29,7 +29,7 @@ export class ClaudeMatchingStrategy implements MatchingStrategy {
     // Anthropic client reads ANTHROPIC_API_KEY from env automatically
     this.client = new Anthropic();
     this.model =
-      process.env['CLAUDE_MODEL']?.trim() || 'claude-3-5-haiku-20241022';
+      process.env['CLAUDE_MODEL']?.trim() || 'claude-haiku-4-5-20251001';
   }
 
   async match(needs: Need[], resources: Resource[]): Promise<MatchResult[]> {
