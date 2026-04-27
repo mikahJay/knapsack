@@ -73,6 +73,8 @@ function parseArgs(argv: string[]): Args {
       args.noAi = true;
     } else if (!arg.startsWith('--')) {
       positionals.push(arg);
+    } else {
+      die(`Unknown option "${arg}". Supported options: --needs, --resources, --owners, --bob-pct, --public-pct, --no-ai`);
     }
   }
 
@@ -101,6 +103,38 @@ function parseIntArg(flag: string, raw: string | undefined): number {
 function die(msg: string): never {
   console.error(`Error: ${msg}`);
   process.exit(1);
+}
+
+function ensureGeneratedCount(
+  kind: 'need' | 'resource',
+  items: GeneratedItem[],
+  requested: number
+): Array<{ title: string; description: string }> {
+  const cleaned = items
+    .map((item) => ({
+      title: String(item.title ?? '').trim(),
+      description: String(item.description ?? '').trim(),
+    }))
+    .filter((item) => item.title.length > 0);
+
+  if (cleaned.length < requested) {
+    console.log(
+      `Warning: Claude returned ${cleaned.length}/${requested} ${kind}(s); filling ${requested - cleaned.length} with fallback data.`
+    );
+  } else if (cleaned.length > requested) {
+    console.log(
+      `Warning: Claude returned ${cleaned.length}/${requested} ${kind}(s); truncating extras.`
+    );
+  }
+
+  while (cleaned.length < requested) {
+    cleaned.push({
+      title: kind === 'need' ? randomNeedTitle() : randomResourceTitle(),
+      description: randomDescription(kind),
+    });
+  }
+
+  return cleaned.slice(0, requested);
 }
 
 // ── Database helpers ─────────────────────────────────────────────────────────
@@ -262,11 +296,19 @@ async function main(): Promise<void> {
   } else {
     if (args.needs > 0) {
       console.log(`Generating ${args.needs} need(s) with Claude …`);
-      needItems = await generateWithClaude('need', args.needs);
+      needItems = ensureGeneratedCount(
+        'need',
+        await generateWithClaude('need', args.needs),
+        args.needs
+      );
     }
     if (args.resources > 0) {
       console.log(`Generating ${args.resources} resource(s) with Claude …`);
-      resourceItems = await generateWithClaude('resource', args.resources);
+      resourceItems = ensureGeneratedCount(
+        'resource',
+        await generateWithClaude('resource', args.resources),
+        args.resources
+      );
     }
   }
 
