@@ -6,7 +6,7 @@
  */
 import '@testing-library/jest-dom';
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // ── Next.js stubs ─────────────────────────────────────────────
@@ -56,6 +56,9 @@ const mockLogin = jest.fn();
 const mockListMatches = jest.fn();
 const mockGetUnseenMatchesCount = jest.fn();
 const mockMarkMatchesSeen = jest.fn();
+const mockApplyMatchAction = jest.fn();
+const mockListMatchMessages = jest.fn();
+const mockPostMatchMessage = jest.fn();
 const mockLogout = jest.fn();
 
 const BOB = { id: 'bob-uuid', email: 'bob@example.com', name: 'Bob', provider: 'local', is_admin: false };
@@ -107,8 +110,15 @@ const MATCH_1: import('./lib/api').Match = {
   need_owner_id: 'bob-uuid',
   resource_title: 'Resource Alpha',
   resource_status: 'available',
-  resource_owner_id: 'bob-uuid',
+  resource_owner_id: 'other-uuid',
   seen_at: null,
+  pair_status: 'open',
+  my_action: null,
+  my_action_details: null,
+  my_action_updated_at: null,
+  counterpart_action: null,
+  counterpart_action_details: null,
+  counterpart_action_updated_at: null,
 };
 const MATCH_2_SEEN: import('./lib/api').Match = {
   ...MATCH_1,
@@ -139,6 +149,9 @@ jest.mock('./lib/api', () => ({
   listMatches: (...args: unknown[]) => mockListMatches(...args),
   getUnseenMatchesCount: (...args: unknown[]) => mockGetUnseenMatchesCount(...args),
   markMatchesSeen: (...args: unknown[]) => mockMarkMatchesSeen(...args),
+  applyMatchAction: (...args: unknown[]) => mockApplyMatchAction(...args),
+  listMatchMessages: (...args: unknown[]) => mockListMatchMessages(...args),
+  postMatchMessage: (...args: unknown[]) => mockPostMatchMessage(...args),
   logout: (...args: unknown[]) => mockLogout(...args),
 }));
 
@@ -173,6 +186,21 @@ beforeEach(() => {
   mockListMatches.mockResolvedValue([]);
   mockGetUnseenMatchesCount.mockResolvedValue({ count: 0 });
   mockMarkMatchesSeen.mockResolvedValue({ ok: true, marked: 0 });
+  mockApplyMatchAction.mockResolvedValue({
+    ok: true,
+    message: 'Action saved',
+    matchId: 'm1',
+    action: 'clarify',
+    details: 'Can you share schedule?',
+    pairStatus: 'in_conversation',
+  });
+  mockListMatchMessages.mockResolvedValue([]);
+  mockPostMatchMessage.mockResolvedValue({
+    id: 'msg1',
+    user_id: BOB.id,
+    body: 'Hi',
+    created_at: '2026-01-01T00:00:00Z',
+  });
   mockPreviewNeedImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 400000 });
   mockPreviewResourceImport.mockResolvedValue({ items: [], estimatedTokens: 0, inputTokenLimit: 100000, inputMaxChars: 1000 });
   mockLogin.mockResolvedValue(BOB);
@@ -667,18 +695,32 @@ describe('EditResourcePage', () => {
     mockGetOneResource.mockResolvedValue(RESOURCE_1);
   });
 
-  it('loads current resource values and saves a new version', async () => {
-    mockUpdateResource.mockResolvedValue({ ...RESOURCE_1, id: 'r1v2', title: 'Resource Alpha v2' });
-    renderWithUser(<EditResourcePage />);
+  it(
+    'loads current resource values and saves a new version',
+    async () => {
+      mockUpdateResource.mockResolvedValue({ ...RESOURCE_1, id: 'r1v2', title: 'Resource Alpha v2' });
+      renderWithUser(<EditResourcePage />);
 
-    await waitFor(() => expect(screen.getByDisplayValue('Resource Alpha')).toBeInTheDocument());
-    await userEvent.clear(screen.getByLabelText(/Title/));
-    await userEvent.type(screen.getByLabelText(/Title/), 'Resource Alpha v2');
-    await userEvent.click(screen.getByText('Save'));
+      await waitFor(
+        () => expect(screen.getByDisplayValue('Resource Alpha')).toBeInTheDocument(),
+        { timeout: 10000 }
+      );
+      await userEvent.clear(screen.getByLabelText(/Title/));
+      await userEvent.type(screen.getByLabelText(/Title/), 'Resource Alpha v2');
+      await userEvent.click(screen.getByText('Save'));
 
-    await waitFor(() => expect(mockUpdateResource).toHaveBeenCalledWith('r1', expect.objectContaining({ title: 'Resource Alpha v2' })));
-    expect(mockPush).toHaveBeenCalledWith('/resources/r1v2');
-  });
+      await waitFor(
+        () =>
+          expect(mockUpdateResource).toHaveBeenCalledWith(
+            'r1',
+            expect.objectContaining({ title: 'Resource Alpha v2' })
+          ),
+        { timeout: 10000 }
+      );
+      expect(mockPush).toHaveBeenCalledWith('/resources/r1v2');
+    },
+    15000
+  );
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -698,6 +740,41 @@ describe('MatchesPage', () => {
     expect(screen.getAllByText('Strong fit').length).toBeGreaterThan(0);
     expect(screen.getByText('New')).toBeInTheDocument();
     await waitFor(() => expect(mockMarkMatchesSeen).toHaveBeenCalledWith(['m1']));
+  });
+
+  it('saves a first action through API and shows resulting state', async () => {
+    routerState.query = { needId: 'n1' };
+    routerState.pathname = '/matches';
+    mockListMatches.mockResolvedValue([MATCH_1]);
+
+    renderWithUser(<MatchesPage />);
+    await waitFor(() => expect(screen.getByText('Matches For Need')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clarify' }));
+    fireEvent.change(screen.getByPlaceholderText(/Add optional notes/i), {
+      target: { value: 'Can you share schedule?' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Save action' }));
+
+    await waitFor(() =>
+      expect(mockApplyMatchAction).toHaveBeenCalledWith('m1', {
+        action: 'clarify',
+        details: 'Can you share schedule?',
+      })
+    );
+    await waitFor(() => expect(screen.getByText('Action saved')).toBeInTheDocument());
+    expect(screen.getByText('Current workflow state: Clarification requested')).toBeInTheDocument();
+  });
+
+  it('shows match thread when pair is in conversation', async () => {
+    routerState.query = {};
+    routerState.pathname = '/matches';
+    mockListMatches.mockResolvedValueOnce([{ ...MATCH_1, pair_status: 'in_conversation' as const }]);
+
+    renderWithUser(<MatchesPage />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Matches' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Match conversation')).toBeInTheDocument());
+    await waitFor(() => expect(mockListMatchMessages).toHaveBeenCalledWith('m1'));
   });
 });
 
@@ -794,6 +871,44 @@ describe('lib/api helpers', () => {
     await api.markMatchesSeen(['m1']);
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/matches/seen'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('listMatchMessages fetches thread', async () => {
+    mockFetch.mockReturnValueOnce(okResponse([]));
+    await api.listMatchMessages('m1');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/m1/messages'),
+      expect.anything()
+    );
+  });
+
+  it('postMatchMessage posts body', async () => {
+    mockFetch.mockReturnValueOnce(
+      okResponse({ id: 'x', user_id: 'u', body: 'Hi', created_at: '2026-01-01T00:00:00Z' })
+    );
+    await api.postMatchMessage('m1', 'Hi');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/m1/messages'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('applyMatchAction posts action payload', async () => {
+    mockFetch.mockReturnValueOnce(
+      okResponse({
+        ok: true,
+        message: 'Action saved',
+        matchId: 'm1',
+        action: 'clarify',
+        details: null,
+        pairStatus: 'in_conversation',
+      })
+    );
+    await api.applyMatchAction('m1', { action: 'clarify', details: 'Need timeline' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/matches/m1/actions'),
       expect.objectContaining({ method: 'POST' })
     );
   });

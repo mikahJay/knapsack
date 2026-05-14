@@ -58,6 +58,17 @@ Deletes, in order:
 Bob (`bob@local.dev`, `provider = 'local'`) is **not** deleted, but any needs/resources
 he owns that carry the `[TEST-DATA]` title prefix are removed.
 
+### `npm run test` — unit tests for CLI parsing and generation guards
+
+```bash
+npm run test
+```
+
+Notes:
+
+- Unknown CLI options now fail fast (for example, `--resource` is rejected; use `--resources`).
+- AI generation is guarded so under-/over-produced model output cannot crash inserts.
+
 ## How it works
 
 ### Owner pool

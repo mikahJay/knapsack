@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
+import MatchThread from '../../components/MatchThread';
 import { listMatches, markMatchesSeen, Match, MatchActionType, applyMatchAction } from '../../lib/api';
 
 function formatDateTime(iso: string): string {
@@ -160,7 +161,8 @@ export default function MatchesPage() {
               : 'Your current need and resource matches, ordered from newest to oldest.'}
           </p>
           <p className="text-xs text-indigo-700 mt-2">
-            Workflow scaffold: actions are sent to API; DB persistence lands with the action-state migration.
+            First actions are per side; pair status reconciles both sides. When both soft-yes, the pair moves to mutual
+            interest. Use the match thread once the pair is in conversation.
           </p>
         </div>
         {isFiltered && (
@@ -192,6 +194,7 @@ export default function MatchesPage() {
               'rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50';
             const closeRecommended = workflowState?.type === 'rejected' || workflowState?.type === 'flagged';
             const pairStatus = workflowState?.pairStatus ?? match.pair_status;
+            const threadEnabled = pairStatus === 'in_conversation' || pairStatus === 'mutual_interest';
             const isSaving = Boolean(savingByMatchId[match.id]);
             const saveError = errorByMatchId[match.id];
             const saveMessage = messageByMatchId[match.id];
@@ -256,6 +259,28 @@ export default function MatchesPage() {
                     </div>
                     {match.rationale && (
                       <p className={`mt-4 text-sm font-semibold ${textClasses}`}>{match.rationale}</p>
+                    )}
+                    {pairStatus === 'mutual_interest' && (
+                      <p className="mt-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-900">
+                        Mutual soft yes — both owners signalled interest. Use the thread to align on conditions before any
+                        fulfillment step.
+                      </p>
+                    )}
+                    {match.counterpart_action && (
+                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Counterparty</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-900">
+                          {ACTION_LABELS[match.counterpart_action]}
+                        </p>
+                        {match.counterpart_action_details && (
+                          <p className="mt-1 text-sm text-emerald-800">{match.counterpart_action_details}</p>
+                        )}
+                        {match.counterpart_action_updated_at && (
+                          <p className="mt-1 text-xs text-emerald-700">
+                            Updated {formatDateTime(match.counterpart_action_updated_at)}
+                          </p>
+                        )}
+                      </div>
                     )}
                     {workflowState && (
                       <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
@@ -328,6 +353,7 @@ export default function MatchesPage() {
                         </button>
                       </div>
                     </div>
+                    <MatchThread matchId={match.id} enabled={threadEnabled} />
                     {draft && (
                       <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
                         <p className="text-sm font-semibold text-gray-800">

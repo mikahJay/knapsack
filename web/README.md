@@ -83,6 +83,25 @@ All API calls go through `src/lib/api.ts`. Key behaviours:
 
 ---
 
+## Testing
+
+Tests use Jest + Testing Library. API calls and Next.js router/link are mocked — no API server required.
+
+```bash
+# From this directory:
+npm run test
+
+# Faster CI-style run (no coverage):
+npm run test:ci
+
+# From the repository root:
+npm run test:web
+```
+
+Main suite: `src/web.test.tsx`.
+
+---
+
 ## Building
 
 ```bash

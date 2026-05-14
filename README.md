@@ -8,6 +8,8 @@ The monorepo contains:
 |---|---|
 | `api/` | Node.js / Express REST API backed by PostgreSQL |
 | `web/` | Next.js web front-end |
+| `matcher/` | Matching service (scheduled + API) |
+| `test-data/` | DB seed/cleanup scripts + small CLI unit tests |
 | `scripts/` | Setup and start scripts for every platform |
 
 ---
@@ -150,12 +152,17 @@ watcher-based dev servers. This is more stable on Windows hosts using Docker Des
 ## Testing
 
 ```bash
-npm run test               # run tests for both services
-npm run test --prefix api  # API tests only
-npm run test --prefix web  # web tests only
+npm run test               # run all configured unit tests (api + web + test-data)
+npm run test:api           # API tests only
+npm run test:web           # web tests only
+npm run test:test-data     # test-data unit tests only
 ```
 
+From the repo root you can also run **`scripts/test.ps1`** (Windows) or **`scripts/test.sh`** (Unix) — same three suites as `npm run test`.
+
 API tests use Jest + Supertest. The database layer is fully mocked — no running Postgres instance required.
+Web tests use Jest + Testing Library with mocked API calls and Next.js router/link shims.
+Test-data tests use Node's built-in test runner with ts-node.
 
 ---
 
@@ -180,6 +187,8 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 knapsack/
 ├── api/               # Express REST API       → see api/README.md
 ├── web/               # Next.js front-end      → see web/README.md
+├── matcher/           # Matching service
+├── test-data/         # Seed scripts           → see test-data/README.md
 ├── scripts/           # setup.sh / setup.ps1 / start.sh / start.ps1
 ├── docker-compose.yml
 ├── .env.example

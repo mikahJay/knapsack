@@ -166,10 +166,11 @@ Tests use Jest + Supertest. The `pg` pool and `connect-pg-simple` store are mock
 npm run test
 
 # From the repository root:
-npm run test --prefix api
+npm run test:api
+# (equivalent: npm run test --prefix api)
 ```
 
-Test file: `src/api.test.ts`
+Additional suites live under `src/**/*.test.ts` (for example `src/import/*`).
 
 ---
 

@@ -34,7 +34,7 @@ import { generateWithClaude, GeneratedItem } from './claude';
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
 
-interface Args {
+export interface Args {
   env: 'prod' | 'non-prod';
   needs: number;
   resources: number;
@@ -44,7 +44,16 @@ interface Args {
   noAi: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
+/** Thrown for invalid CLI usage (e.g. unknown flags); callers may catch and exit cleanly. */
+export class CliError extends Error {
+  readonly code = 'CLI';
+  constructor(message: string) {
+    super(message);
+    this.name = 'CliError';
+  }
+}
+
+export function parseArgs(argv: string[]): Args {
   const args: Args = {
     env: 'non-prod',
     needs: 10,
@@ -74,7 +83,9 @@ function parseArgs(argv: string[]): Args {
     } else if (!arg.startsWith('--')) {
       positionals.push(arg);
     } else {
-      die(`Unknown option "${arg}". Supported options: --needs, --resources, --owners, --bob-pct, --public-pct, --no-ai`);
+      throw new CliError(
+        `Unknown option "${arg}". Supported options: --needs, --resources, --owners, --bob-pct, --public-pct, --no-ai`
+      );
     }
   }
 
@@ -105,7 +116,7 @@ function die(msg: string): never {
   process.exit(1);
 }
 
-function ensureGeneratedCount(
+export function ensureGeneratedCount(
   kind: 'need' | 'resource',
   items: GeneratedItem[],
   requested: number
@@ -243,7 +254,16 @@ function buildPublicFlags(total: number, publicPct: number): boolean[] {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+  let args: Args;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (e) {
+    if (e instanceof CliError) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+    throw e;
+  }
 
   console.log(
     `\nGenerating test data [env=${args.env}] ` +
@@ -363,9 +383,11 @@ async function main(): Promise<void> {
   console.log('─────────────────────────────────────────\n');
 }
 
-main()
-  .catch((err) => {
-    console.error('Fatal error:', err);
-    process.exit(1);
-  })
-  .finally(() => end());
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error('Fatal error:', err);
+      process.exit(1);
+    })
+    .finally(() => end());
+}

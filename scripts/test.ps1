@@ -42,6 +42,20 @@ try {
     Pop-Location
 }
 
+# ── test-data unit tests ───────────────────────────────────────
+Write-Info "Running test-data unit tests..."
+Push-Location "$RootDir\test-data"
+try {
+    npm run test
+    if ($LASTEXITCODE -ne 0) { $failed += 'test-data' }
+    else { Write-Success "test-data tests passed." }
+} catch {
+    Write-Err "test-data tests threw an exception: $_"
+    $failed += 'test-data'
+} finally {
+    Pop-Location
+}
+
 # ── Summary ───────────────────────────────────────────────────
 Write-Host ""
 if ($failed.Count -eq 0) {

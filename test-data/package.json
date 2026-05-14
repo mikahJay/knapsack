@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "generate": "ts-node src/generate.ts",
-    "delete": "ts-node src/delete.ts"
+    "delete": "ts-node src/delete.ts",
+    "test": "node --test -r ts-node/register src/generate.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

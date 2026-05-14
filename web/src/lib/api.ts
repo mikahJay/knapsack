@@ -142,10 +142,13 @@ export interface Match {
   resource_status: string;
   resource_owner_id: UUID | null;
   seen_at: string | null;
-  pair_status: 'open' | 'in_conversation' | 'closed_rejected' | 'closed_flagged';
+  pair_status: 'open' | 'in_conversation' | 'mutual_interest' | 'closed_rejected' | 'closed_flagged';
   my_action: MatchActionType | null;
   my_action_details: string | null;
   my_action_updated_at: string | null;
+  counterpart_action: MatchActionType | null;
+  counterpart_action_details: string | null;
+  counterpart_action_updated_at: string | null;
 }
 
 export type MatchActionType = 'rejected' | 'clarify' | 'soft_yes' | 'snoozed' | 'flagged';
@@ -161,7 +164,14 @@ export interface MatchActionResponse {
   matchId: UUID;
   action: MatchActionType;
   details: string | null;
-  pairStatus: 'open' | 'in_conversation' | 'closed_rejected' | 'closed_flagged';
+  pairStatus: 'open' | 'in_conversation' | 'mutual_interest' | 'closed_rejected' | 'closed_flagged';
+}
+
+export interface MatchMessage {
+  id: UUID;
+  user_id: UUID;
+  body: string;
+  created_at: string;
 }
 
 async function apiFetch<T>(
@@ -272,6 +282,15 @@ export const applyMatchAction = (matchId: string, body: MatchActionRequest) =>
   apiFetch<MatchActionResponse>(`/api/matches/${encodeURIComponent(matchId)}/actions`, {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+
+export const listMatchMessages = (matchId: string) =>
+  apiFetch<MatchMessage[]>(`/api/matches/${encodeURIComponent(matchId)}/messages`);
+
+export const postMatchMessage = (matchId: string, body: string) =>
+  apiFetch<MatchMessage>(`/api/matches/${encodeURIComponent(matchId)}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
   });
 
 // ── Admin ─────────────────────────────────────────────────────

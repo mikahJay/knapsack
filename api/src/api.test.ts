@@ -227,6 +227,13 @@ describe('Matches — authenticated', () => {
         resource_status: 'available',
         resource_owner_id: 'other-uuid',
         seen_at: null,
+        pair_status: 'open',
+        my_action: null,
+        my_action_details: null,
+        my_action_updated_at: null,
+        counterpart_action: null,
+        counterpart_action_details: null,
+        counterpart_action_updated_at: null,
       },
     ];
     mockQuery.mockResolvedValueOnce(matches);
@@ -257,6 +264,115 @@ describe('Matches — authenticated', () => {
   it('POST /api/matches/seen returns 400 for non-array payload', async () => {
     const res = await agent.post('/api/matches/seen').send({ matchIds: 'm1' });
     expect(res.status).toBe(400);
+  });
+
+  it('POST /api/matches/:id/actions returns 400 for invalid action', async () => {
+    const res = await agent.post('/api/matches/m1/actions').send({ action: 'nope' });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/matches/:id/actions returns 404 when user cannot access match', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    const res = await agent.post('/api/matches/missing/actions').send({ action: 'clarify' });
+    expect(res.status).toBe(404);
+  });
+
+  it('POST /api/matches/:id/actions upserts action and updates pair status', async () => {
+    mockQuery
+      .mockResolvedValueOnce([
+        {
+          id: 'm1',
+          pair_status: 'open',
+          need_owner_id: BOB.id,
+          resource_owner_id: 'other-uuid',
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ user_id: BOB.id, action: 'rejected' }])
+      .mockResolvedValueOnce([]);
+
+    const res = await agent
+      .post('/api/matches/m1/actions')
+      .send({ action: 'rejected', details: 'Not a fit' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      ok: true,
+      matchId: 'm1',
+      action: 'rejected',
+      details: 'Not a fit',
+      pairStatus: 'closed_rejected',
+    });
+    expect(mockQuery).toHaveBeenCalledTimes(4);
+  });
+
+  it('POST /api/matches/:id/actions returns 409 when match already closed', async () => {
+    mockQuery.mockResolvedValueOnce([
+      {
+        id: 'm1',
+        pair_status: 'closed_rejected',
+        need_owner_id: BOB.id,
+        resource_owner_id: 'other-uuid',
+      },
+    ]);
+
+    const res = await agent.post('/api/matches/m1/actions').send({ action: 'soft_yes', details: 'Still interested' });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'Match is already closed' });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /api/matches/:id/actions sets mutual_interest when both owners soft_yes', async () => {
+    mockQuery
+      .mockResolvedValueOnce([
+        {
+          id: 'm1',
+          pair_status: 'in_conversation',
+          need_owner_id: BOB.id,
+          resource_owner_id: 'other-uuid',
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { user_id: BOB.id, action: 'soft_yes' },
+        { user_id: 'other-uuid', action: 'soft_yes' },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const res = await agent.post('/api/matches/m1/actions').send({ action: 'soft_yes', details: 'Works for me' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.pairStatus).toBe('mutual_interest');
+    expect(mockQuery).toHaveBeenCalledTimes(4);
+  });
+
+  it('GET /api/matches/:id/messages returns list', async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ id: 'm1' }])
+      .mockResolvedValueOnce([
+        { id: 'msg1', user_id: BOB.id, body: 'Hello', created_at: '2026-01-01T00:00:00Z' },
+      ]);
+
+    const res = await agent.get('/api/matches/m1/messages');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { id: 'msg1', user_id: BOB.id, body: 'Hello', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('POST /api/matches/:id/messages creates a message', async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ id: 'm1' }])
+      .mockResolvedValueOnce([
+        { id: 'msg1', user_id: BOB.id, body: 'Hi there', created_at: '2026-01-02T00:00:00Z' },
+      ]);
+
+    const res = await agent.post('/api/matches/m1/messages').send({ body: 'Hi there' });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ body: 'Hi there', user_id: BOB.id });
+    expect(mockQuery).toHaveBeenCalledTimes(2);
   });
 });
 

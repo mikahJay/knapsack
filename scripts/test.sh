@@ -30,6 +30,15 @@ else
   FAILED+=("web")
 fi
 
+# ── test-data unit tests ───────────────────────────────────────
+info "Running test-data unit tests..."
+if (cd "$ROOT_DIR/test-data" && npm run test); then
+  success "test-data tests passed."
+else
+  err "test-data tests failed."
+  FAILED+=("test-data")
+fi
+
 # ── Summary ───────────────────────────────────────────────────
 echo ""
 if [ ${#FAILED[@]} -eq 0 ]; then
