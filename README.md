@@ -164,6 +164,10 @@ API tests use Jest + Supertest. The database layer is fully mocked — no runnin
 Web tests use Jest + Testing Library with mocked API calls and Next.js router/link shims.
 Test-data tests use Node's built-in test runner with ts-node.
 
+### Product demo video (Playwright)
+
+To record an on-product walk-through for the landing page (`web/public/demo/`), plus how to publish it via GitHub, see **`web/public/demo/README.md`** and **`npm run record:demo`** from the repo root.
+
 ---
 
 ## Environment Variables

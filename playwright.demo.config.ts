@@ -9,7 +9,8 @@ const demoOrigin = `http://127.0.0.1:${demoWebPort}`;
 export default defineConfig({
   testDir: 'e2e',
   forbidOnly: Boolean(process.env.CI),
-  timeout: 120_000,
+  // Pause beats add ~24–40s depending on DEMO_STEP_PAUSE_MS; keep headroom with slowMo.
+  timeout: 180_000,
   expect: { timeout: 15_000 },
   workers: 1,
   use: {

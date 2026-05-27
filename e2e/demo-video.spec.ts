@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { test, expect, type BrowserContext } from '@playwright/test';
 
 const DEMO_USER = {
@@ -13,6 +15,20 @@ const RESOURCE_ID = '22222222-2222-2222-2222-222222222222';
 const MATCH_ID = '33333333-3333-3333-3333-333333333333';
 
 const DEMO_NEED_TITLE = 'Winter shelter cot request';
+
+/** Pause so the recorder can rest on each step (milliseconds). Override with DEMO_STEP_PAUSE_MS. */
+function stepPauseMs(): number {
+  const raw = process.env.DEMO_STEP_PAUSE_MS;
+  if (raw !== undefined && raw !== '') {
+    const n = Number(raw);
+    if (!Number.isNaN(n) && n >= 0) return n;
+  }
+  return 2000;
+}
+
+async function pauseBeat(page: { waitForTimeout: (ms: number) => Promise<void> }): Promise<void> {
+  await page.waitForTimeout(stepPauseMs());
+}
 
 const RESOURCE_ROW = {
   id: RESOURCE_ID,
@@ -220,6 +236,7 @@ test.describe('demo recording', () => {
     await page.goto('/resources/import');
 
     await expect(page.getByRole('heading', { name: 'Bulk Import Resources' })).toBeVisible();
+    await pauseBeat(page);
 
     await page.locator('#bulk-resource-photo').setInputFiles({
       name: 'shelf-demo.jpg',
@@ -229,49 +246,60 @@ test.describe('demo recording', () => {
         0x00, 0x00, 0xff, 0xd9,
       ]),
     });
+    await pauseBeat(page);
 
     await page.getByRole('button', { name: 'Preview From Photo' }).click();
 
     await expect(page.getByText('Review Drafts (1)', { exact: false })).toBeVisible({ timeout: 30_000 });
-    await page.waitForTimeout(400);
+    await pauseBeat(page);
 
     await page.getByRole('button', { name: /^Import 1 Resources/ }).click();
 
     await expect(page.getByRole('heading', { name: 'Resources' })).toBeVisible({ timeout: 30_000 });
-    await page.waitForTimeout(500);
+    await pauseBeat(page);
 
     await page.getByRole('link', { name: 'Needs', exact: true }).click();
 
     await expect(page.getByRole('heading', { name: 'Needs' })).toBeVisible();
+    await pauseBeat(page);
     await page.getByRole('link', { name: /^\+ New Need/ }).click();
 
     await expect(page.getByRole('heading', { name: 'New Need' })).toBeVisible();
+    await pauseBeat(page);
+
     await page.locator('#title').fill(DEMO_NEED_TITLE);
     await page.locator('#description').fill(DEMO_NEED.description ?? '');
     await page.getByLabel(/Make public/i).check();
+    await pauseBeat(page);
+
     await page.getByRole('button', { name: 'Create' }).click();
 
     await expect(page.getByRole('heading', { name: 'Needs' })).toBeVisible({ timeout: 30_000 });
-    await page.waitForTimeout(500);
+    await pauseBeat(page);
 
     // Layout sets aria-label to "Matches (n)" when unseen matches exist — not plain "Matches".
     await page.getByRole('link', { name: /^Matches/ }).click();
 
     await expect(page.getByRole('heading', { name: 'Matches' })).toBeVisible();
     await expect(page.getByRole('link', { name: DEMO_NEED_TITLE })).toBeVisible();
-    await page.waitForTimeout(600);
+    await pauseBeat(page);
 
     // Match cards are tall; ensure action buttons below the rationale are scrolled into view.
     const matchRow = page.getByRole('listitem').filter({ hasText: DEMO_NEED_TITLE });
     const clarify = matchRow.getByRole('button', { name: 'Clarify' });
     await clarify.scrollIntoViewIfNeeded();
+    await pauseBeat(page);
     await clarify.click();
 
     await expect(page.getByText('Draft action: Clarification requested')).toBeVisible();
+    await pauseBeat(page);
+
     await page.getByPlaceholder(/optional notes/).fill('Can pallets ship Friday morning?');
+    await pauseBeat(page);
+
     await page.getByRole('button', { name: 'Save action' }).click();
 
     await expect(page.getByText('Current workflow state: Clarification requested')).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(800);
+    await pauseBeat(page);
   });
 });
