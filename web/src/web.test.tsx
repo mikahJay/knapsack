@@ -301,6 +301,14 @@ describe('HomePage', () => {
     expect(screen.getAllByText('Needs').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Resources').length).toBeGreaterThan(0);
   });
+
+  it('renders public marketing home when logged out', async () => {
+    mockGetMe.mockRejectedValue(new Error('unauth'));
+    render(<HomePage />);
+    await waitFor(() => expect(screen.getByText(/Resource allocation, from photo to match/i)).toBeInTheDocument());
+    const signIns = screen.getAllByRole('link', { name: /^Sign in$/i });
+    expect(signIns.some((link) => link.getAttribute('href') === '/login')).toBe(true);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────

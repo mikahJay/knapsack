@@ -1,7 +1,30 @@
-import Layout from '../components/Layout';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import Layout from '../components/Layout';
+import PublicHome from '../components/PublicHome';
+import { getMe, type User } from '../lib/api';
 
 export default function HomePage() {
+  const [user, setUser] = useState<User | null | undefined>(undefined);
+
+  useEffect(() => {
+    getMe()
+      .then((u) => setUser(u))
+      .catch(() => setUser(null));
+  }, []);
+
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <PublicHome />;
+  }
+
   return (
     <Layout>
       <h1 className="text-2xl font-bold text-gray-800 mb-2">Dashboard</h1>

@@ -21,9 +21,11 @@
     "docker:logs:api": "docker compose logs -f api",
     "docker:logs:web": "docker compose logs -f web",
     "docker:ps": "docker compose ps",
-    "docker:analytics": "docker compose --profile analytics up --build"
+    "docker:analytics": "docker compose --profile analytics up --build",
+    "record:demo": "playwright test -c playwright.demo.config.ts && node scripts/copy-demo-video.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.53.2",
     "concurrently": "^8.2.2"
   }
 }
