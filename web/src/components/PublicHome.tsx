@@ -2,6 +2,16 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
 
+/** Browsers treat `default` on &lt;track&gt; inconsistently — force overlays on where supported */
+function showDemoCaptions(video: HTMLVideoElement): void {
+  for (let i = 0; i < video.textTracks.length; i += 1) {
+    const t = video.textTracks[i];
+    if (t.kind === 'captions' || t.kind === 'subtitles') {
+      t.mode = 'showing';
+    }
+  }
+}
+
 export default function PublicHome() {
   const [videoMissing, setVideoMissing] = useState(false);
 
@@ -55,32 +65,45 @@ export default function PublicHome() {
                 </Link>
               </div>
             ) : (
-              <video
-                className="w-full max-w-4xl rounded-xl shadow-md border border-gray-200 bg-black"
-                controls
-                playsInline
-                preload="metadata"
-                onError={() => setVideoMissing(true)}
-              >
-                <source src="/demo/knapsack-product-demo.webm" type="video/webm" />
-                <source src="/demo/knapsack-product-demo.mp4" type="video/mp4" />
-                <track
-                  kind="subtitles"
-                  srcLang="en"
-                  label="English"
-                  src="/demo/knapsack-product-demo-en.vtt"
-                  default
-                />
-                Your browser does not support embedded video.{' '}
-                <Link href="/login" className="text-indigo-600">
-                  Sign in
-                </Link>{' '}
-                to use knapsack.
-              </video>
+              <>
+                <video
+                  className="w-full max-w-4xl rounded-xl shadow-md border border-gray-200 bg-black"
+                  controls
+                  playsInline
+                  preload="metadata"
+                  onLoadedMetadata={(e) => showDemoCaptions(e.currentTarget)}
+                  onCanPlay={(e) => showDemoCaptions(e.currentTarget)}
+                  onError={() => setVideoMissing(true)}
+                >
+                  <source src="/demo/knapsack-product-demo.webm" type="video/webm" />
+                  <source src="/demo/knapsack-product-demo.mp4" type="video/mp4" />
+                  <track
+                    kind="captions"
+                    srcLang="en"
+                    label="English (steps)"
+                    src="/demo/knapsack-product-demo-en.vtt"
+                    default
+                    onLoad={(e) => {
+                      const t = e.currentTarget.track;
+                      if (t) t.mode = 'showing';
+                    }}
+                  />
+                  Your browser does not support embedded video.{' '}
+                  <Link href="/login" className="text-indigo-600">
+                    Sign in
+                  </Link>{' '}
+                  to use knapsack.
+                </video>
+                <p className="text-xs text-gray-500 max-w-4xl">
+                  Step captions use the browser&apos;s video overlay — they&apos;re turned on by default here. Use the player&apos;s{' '}
+                  <span className="font-medium text-gray-600">CC / subtitles</span> control to toggle them off or change
+                  track. Watching only the downloaded <span className="font-mono">.webm</span> outside this page (for
+                  example in some desktop apps) often <span className="font-medium text-gray-600">will not</span> load the
+                  separate <span className="font-mono">.vtt</span> file; use this page or a player that supports sidecar
+                  subtitles.
+                </p>
+              </>
             )}
-            <p className="text-xs text-gray-500 max-w-4xl">
-              Use your player&apos;s closed-caption / subtitles control to show step-by-step captions (WebVTT).
-            </p>
           </section>
 
           <div className="mt-10">

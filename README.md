@@ -61,7 +61,7 @@ chmod +x scripts/setup.sh scripts/start.sh
 ```bash
 # Unix / macOS / Linux
 bash scripts/setup.sh
-bash scripts/start.sh --docker
+bash scripts/start.sh --docker   # Bash: `--docker` is matched case-insensitively (--Docker works)
 
 # Windows (PowerShell)
 .\scripts\setup.ps1

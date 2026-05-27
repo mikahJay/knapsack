@@ -12,6 +12,14 @@ const nextConfig = {
   // File-change polling inside Docker is handled by the WATCHPACK_POLLING=true
   // env var set in docker-compose.yml.
   turbopack: {},
+  async headers() {
+    return [
+      {
+        source: '/demo/knapsack-product-demo-en.vtt',
+        headers: [{ key: 'Content-Type', value: 'text/vtt; charset=utf-8' }],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
