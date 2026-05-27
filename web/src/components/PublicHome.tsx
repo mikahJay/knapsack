@@ -1,20 +1,8 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
-
-/** Browsers treat `default` on &lt;track&gt; inconsistently — force overlays on where supported */
-function showDemoCaptions(video: HTMLVideoElement): void {
-  for (let i = 0; i < video.textTracks.length; i += 1) {
-    const t = video.textTracks[i];
-    if (t.kind === 'captions' || t.kind === 'subtitles') {
-      t.mode = 'showing';
-    }
-  }
-}
+import ProductDemoVideo from './ProductDemoVideo';
 
 export default function PublicHome() {
-  const [videoMissing, setVideoMissing] = useState(false);
-
   return (
     <>
       <Head>
@@ -51,60 +39,7 @@ export default function PublicHome() {
             other party.
           </p>
 
-          <section aria-label="Product demo video" className="space-y-3">
-            {videoMissing ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-600">
-                <p className="font-semibold text-gray-800 mb-2">Demo video not found in this checkout</p>
-                <p className="text-sm mb-4">
-                  Run <code className="bg-gray-100 px-1.5 py-0.5 rounded">npm run record:demo</code> from the repo
-                  root to record it with Playwright (see <code className="bg-gray-100 px-1.5 py-0.5 rounded">web/public/demo/README.md</code>
-                  ).
-                </p>
-                <Link href="/login" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
-                  Sign in to try the app →
-                </Link>
-              </div>
-            ) : (
-              <>
-                <video
-                  className="w-full max-w-4xl rounded-xl shadow-md border border-gray-200 bg-black"
-                  controls
-                  playsInline
-                  preload="metadata"
-                  onLoadedMetadata={(e) => showDemoCaptions(e.currentTarget)}
-                  onCanPlay={(e) => showDemoCaptions(e.currentTarget)}
-                  onError={() => setVideoMissing(true)}
-                >
-                  <source src="/demo/knapsack-product-demo.webm" type="video/webm" />
-                  <source src="/demo/knapsack-product-demo.mp4" type="video/mp4" />
-                  <track
-                    kind="captions"
-                    srcLang="en"
-                    label="English (steps)"
-                    src="/demo/knapsack-product-demo-en.vtt"
-                    default
-                    onLoad={(e) => {
-                      const t = e.currentTarget.track;
-                      if (t) t.mode = 'showing';
-                    }}
-                  />
-                  Your browser does not support embedded video.{' '}
-                  <Link href="/login" className="text-indigo-600">
-                    Sign in
-                  </Link>{' '}
-                  to use knapsack.
-                </video>
-                <p className="text-xs text-gray-500 max-w-4xl">
-                  Step captions use the browser&apos;s video overlay — they&apos;re turned on by default here. Use the player&apos;s{' '}
-                  <span className="font-medium text-gray-600">CC / subtitles</span> control to toggle them off or change
-                  track. Watching only the downloaded <span className="font-mono">.webm</span> outside this page (for
-                  example in some desktop apps) often <span className="font-medium text-gray-600">will not</span> load the
-                  separate <span className="font-mono">.vtt</span> file; use this page or a player that supports sidecar
-                  subtitles.
-                </p>
-              </>
-            )}
-          </section>
+          <ProductDemoVideo showRecorderHint />
 
           <div className="mt-10">
             <Link

@@ -4,6 +4,8 @@ import Layout from '../components/Layout';
 import PublicHome from '../components/PublicHome';
 import { getMe, type User } from '../lib/api';
 
+const IS_PROD = process.env['NEXT_PUBLIC_IS_PROD'] === 'true';
+
 export default function HomePage() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
@@ -28,7 +30,19 @@ export default function HomePage() {
   return (
     <Layout>
       <h1 className="text-2xl font-bold text-gray-800 mb-2">Dashboard</h1>
-      <p className="text-gray-500 mb-8">Welcome to knapsack — your resource allocation platform.</p>
+      <p className="text-gray-500 mb-4">Welcome to knapsack — your resource allocation platform.</p>
+
+      {!IS_PROD && (
+        <p className="text-sm text-gray-600 mb-8">
+          <Link
+            href="/demo"
+            className="font-semibold text-indigo-600 hover:text-indigo-800 underline-offset-2 hover:underline"
+          >
+            Watch the product demo
+          </Link>
+          <span className="text-gray-500"> · step captions in the player (CC)</span>
+        </p>
+      )}
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Link

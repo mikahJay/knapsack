@@ -22,7 +22,7 @@
     "docker:logs:web": "docker compose logs -f web",
     "docker:ps": "docker compose ps",
     "docker:analytics": "docker compose --profile analytics up --build",
-    "record:demo": "playwright test -c playwright.demo.config.ts && node scripts/copy-demo-video.mjs"
+    "record:demo": "node scripts/assert-node-record-demo.mjs && playwright test -c playwright.demo.config.ts && node scripts/copy-demo-video.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.53.2",

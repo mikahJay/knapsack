@@ -5,6 +5,8 @@
 
 ## Record the demo locally
 
+**Node.js:** `npm run record:demo` must start Next.js&nbsp;16’s dev server, so **Node 20.9+** is required. If you’re on Node 18, the script will exit with instructions (`scripts/assert-node-record-demo.mjs`).
+
 Before recording, **stop any other `next dev`** for this repo’s `web/` folder. Next 16 allows only one dev server per project directory (otherwise you’ll see “Another next dev server is already running”).
 
 **Turbopack vs webpack:** Plain `next dev` (Turbopack in Next 16) has been observed to render `pages/matches/index` **without** the workflow action buttons. The recorder therefore starts **`next dev --webpack`** on **port 3330** (`PW_DEMO_WEB_PORT` to override) so it does not fight with whatever you run on :3000. Only set `PW_REUSE_WEB=1` when the server you’re reusing is webpack-based and shows the Clarify/Reject/etc. buttons on Matches.

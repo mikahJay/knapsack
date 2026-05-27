@@ -300,6 +300,7 @@ describe('HomePage', () => {
     await waitFor(() => expect(screen.getByText('Dashboard')).toBeInTheDocument());
     expect(screen.getAllByText('Needs').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Resources').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /Watch the product demo/i })).toHaveAttribute('href', '/demo');
   });
 
   it('renders public marketing home when logged out', async () => {
