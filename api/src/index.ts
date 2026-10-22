@@ -12,6 +12,7 @@ import { needsRouter } from './needs/router';
 import { resourcesRouter } from './resources/router';
 import { adminRouter } from './admin/router';
 import { matchesRouter } from './matches/router';
+import { engagementsRouter } from './engagement/router';
 
 export function createApp(): express.Application {
   const app = express();
@@ -86,6 +87,7 @@ export function createApp(): express.Application {
   app.use('/api/needs', needsRouter);
   app.use('/api/resources', resourcesRouter);
   app.use('/api/matches', matchesRouter);
+  app.use('/api/engagements', engagementsRouter);
   app.use('/admin', adminRouter);
 
   // ── Health checks ────────────────────────────────────────────

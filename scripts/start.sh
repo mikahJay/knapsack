@@ -2,8 +2,8 @@
 # ─────────────────────────────────────────────────────────────
 # Knapsack – start script (Unix / Linux / macOS)
 # Usage:
-#   bash scripts/start.sh           # local dev (ts-node-dev + next dev)
-#   bash scripts/start.sh --docker  # Docker Compose stack
+#   bash scripts/start.sh              # local dev (ts-node-dev + next dev)
+#   bash scripts/start.sh --docker     # Docker Compose stack (case-insensitive: --Docker, etc.)
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -20,7 +20,8 @@ error()   { echo -e "${RED}[start] ERROR:${RESET} $*" >&2; exit 1; }
 
 USE_DOCKER=false
 for arg in "$@"; do
-  [[ "$arg" == "--docker" ]] && USE_DOCKER=true
+  normalized="$(printf '%s' "$arg" | tr '[:upper:]' '[:lower:]')"
+  [[ "$normalized" == "--docker" ]] && USE_DOCKER=true
 done
 
 # ── Guard: dependencies installed ────────────────────────────

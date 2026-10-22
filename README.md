@@ -61,7 +61,7 @@ chmod +x scripts/setup.sh scripts/start.sh
 ```bash
 # Unix / macOS / Linux
 bash scripts/setup.sh
-bash scripts/start.sh --docker
+bash scripts/start.sh --docker   # Bash: `--docker` is matched case-insensitively (--Docker works)
 
 # Windows (PowerShell)
 .\scripts\setup.ps1
@@ -163,6 +163,10 @@ From the repo root you can also run **`scripts/test.ps1`** (Windows) or **`scrip
 API tests use Jest + Supertest. The database layer is fully mocked — no running Postgres instance required.
 Web tests use Jest + Testing Library with mocked API calls and Next.js router/link shims.
 Test-data tests use Node's built-in test runner with ts-node.
+
+### Product demo video (Playwright)
+
+To record an on-product walk-through for the landing page (`web/public/demo/`), plus how to publish it via GitHub, see **`web/public/demo/README.md`** and **`npm run record:demo`** from the repo root.
 
 ---
 

@@ -19,6 +19,8 @@ RUN npm run build
 FROM node:20-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
+# `next start` serves `public/` (e.g. demo video assets under public/demo/).
+COPY --from=build /app/public ./public
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/next.config.js ./next.config.js
 COPY package*.json ./

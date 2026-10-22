@@ -1,0 +1,41 @@
+WEBVTT
+
+NOTE
+Timed for the Playwright recorder at moderate pacing.
+Re-timestamp after re-recording (`npm run record:demo`) if steps drift.
+
+00:00:00.500 --> 00:00:04.800
+Overview: we'll list supply from a photo, post a complementary need,
+
+00:00:04.900 --> 00:00:08.800
+then open Matches and save a first workflow action.
+
+00:00:09.500 --> 00:00:14.800
+Navigate to Bulk Import Resources—the page where photo import lives.
+
+00:00:15.200 --> 00:00:20.800
+Choose a JPEG, PNG, or WebP shelf or inventory-style photo,
+
+00:00:20.900 --> 00:00:26.800
+then run Preview From Photo to extract a drafted resource listing.
+
+00:00:27.400 --> 00:00:33.600
+Review the draft title, visibility, and quantity before saving.
+
+00:00:34.000 --> 00:00:40.200
+Commit Import publishes the resource to your catalog.
+
+00:00:40.800 --> 00:00:47.600
+Post a matching need—for example shelters ordering the same SKU class.
+
+00:00:48.200 --> 00:00:55.600
+Creating the need enters it into matching so pairs can surface.
+
+00:00:56.200 --> 00:01:04.600
+Open Matches: knapsack shows the suggested pairing with rationale and score.
+
+00:01:05.200 --> 00:01:12.600
+Kick off coordination: Clarify queues optional notes,
+
+00:01:12.700 --> 00:01:19.600
+Save action transitions the pair to in-conversation—you can use the thread next.

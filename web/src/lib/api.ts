@@ -174,6 +174,70 @@ export interface MatchMessage {
   created_at: string;
 }
 
+export interface EngagementPayload {
+  id: UUID;
+  match_id: UUID;
+  status: string;
+  initiated_by: UUID | null;
+  reserved_at: string | null;
+  in_fulfillment_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  metadata: unknown;
+  created_at: string;
+  updated_at: string;
+  need_title: string;
+  resource_title: string;
+}
+
+/** Full engagement row joined to match titles (detail view). */
+export interface EngagementDetailFields extends EngagementPayload {
+  need_id: UUID;
+  resource_id: UUID;
+}
+
+export interface EngagementEngagementMessage {
+  id: UUID;
+  engagement_id: UUID;
+  kind: string;
+  sender_id: UUID | null;
+  body: string;
+  created_at: string;
+}
+
+export interface EngagementFulfillmentTask {
+  id: UUID;
+  engagement_id: UUID;
+  task_type: string;
+  status: string;
+  sort_order: number;
+  title: string | null;
+  details: unknown;
+  started_at: string | null;
+  completed_at: string | null;
+  completed_by: UUID | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EngagementDetailPayload {
+  engagement: EngagementDetailFields;
+  messages: EngagementEngagementMessage[];
+  tasks: EngagementFulfillmentTask[];
+}
+
+export interface EngagementMatchContext {
+  need_id: UUID;
+  resource_id: UUID;
+  need_title: string;
+  resource_title: string;
+}
+
+export interface EngagementForMatchPayload {
+  engagement: EngagementPayload | null;
+  match: EngagementMatchContext;
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -291,6 +355,19 @@ export const postMatchMessage = (matchId: string, body: string) =>
   apiFetch<MatchMessage>(`/api/matches/${encodeURIComponent(matchId)}/messages`, {
     method: 'POST',
     body: JSON.stringify({ body }),
+  });
+
+// ── Engagements ────────────────────────────────────────────────
+export const getEngagement = (engagementId: string) =>
+  apiFetch<EngagementDetailPayload>(`/api/engagements/${encodeURIComponent(engagementId)}`);
+
+export const getEngagementForMatch = (matchId: string) =>
+  apiFetch<EngagementForMatchPayload>(`/api/engagements/for-match/${encodeURIComponent(matchId)}`);
+
+export const createEngagement = (matchId: string) =>
+  apiFetch<EngagementPayload>('/api/engagements', {
+    method: 'POST',
+    body: JSON.stringify({ matchId }),
   });
 
 // ── Admin ─────────────────────────────────────────────────────
